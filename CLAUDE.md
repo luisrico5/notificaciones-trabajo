@@ -90,11 +90,13 @@ está en medio y el archivo se regenera).
   las filas cargadas y sus ediciones se guardan en `localStorage` en cada render y edición (debounce), y se
   restauran al abrir. Al restaurar se re-ejecuta `recompAuto` (respeta lo editado, re-sincroniza autos con
   la base vigente). Botón **"Vaciar sesión"** en la tarjeta 03.
-- `autoTecnico(row)` + campo **"Trabajo realizado por:"** (última línea del `.txt`): nombre del técnico
+- `autoTecnico(row)` + campo **"Trabajo realizado por:"** (penúltima línea del `.txt`): nombre del técnico
   del último reporte de calibración (`WHOCALIBRATED`, campo `by`), **solo si ese reporte es reciente**
   (menos de 2 meses respecto a `row.fecha`). Si es antiguo (≥2 meses), faltan fechas o el TAG no está en
   la base → vacío para llenar a mano. Editable. Se recalcula al cambiar la fecha de la plantilla.
   `d` = fecha del reporte (yyyy-MM-dd); `parseDMY`/`parseISO`/`addMonths` hacen la comparación.
+- Campo **"Trabajo recibido por:"** (última línea del `.txt`, `fields.recibido`): **manual**, arranca vacío
+  y no se autocalcula (quien recibe/acepta el trabajo). Editable; se persiste con la sesión.
 - **Actualizar los datos sin reconstruir** (`CAL_OVERRIDE` / `CAL_STORE_KEY` / tarjeta 02 "Base de
   calibración"): `src/extract_ranges.ps1` también genera `datos_calibracion.json`; el usuario lo adjunta
   en el dashboard (input `importCalib`), se guarda en `localStorage` y **manda sobre los datos

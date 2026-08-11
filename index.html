@@ -843,7 +843,8 @@ function makeRow(ot, denom, equipo, fecha){
     tag:tagOf(denom), equipo:String(equipo==null?"":equipo).trim(), fecha:String(fecha||"").trim(),
     key:null, proc:"", nombre:"", optIndex:-1, hasOpts:false, isValve:false, valFalla:"", valTecno:"", saved:false,
     // undefined = aún no editado por el usuario; recompAuto lo rellena con el texto automático.
-    fields:{comoEncontro:undefined,falla:undefined,motivo:undefined,descripcion:undefined,comoDejo:undefined,equipos:undefined,tecnico:undefined} };
+    // `recibido` es manual (no se autocalcula): arranca vacío.
+    fields:{comoEncontro:undefined,falla:undefined,motivo:undefined,descripcion:undefined,comoDejo:undefined,equipos:undefined,tecnico:undefined,recibido:""} };
   // Si la denominación no trae un TAG reconocible, se toma el de la columna de equipo.
   if(!looksLikeTag(row.tag) && looksLikeTag(row.equipo)) row.tag=tagOf(row.equipo);
   row.key=detectKey(row.tag,row.denom);
@@ -2504,7 +2505,8 @@ function genText(row){
     "Cómo se dejó el equipo:", (f.comoDejo||""), "",
     "¿Qué equipos o patrones se utilizaron?:", (f.equipos||""), "",
     "Fecha fin: "+fi, "",
-    "Trabajo realizado por: "+(f.tecnico||""), ""
+    "Trabajo realizado por: "+(f.tecnico||""), "",
+    "Trabajo recibido por: "+(f.recibido||""), ""
   ].join("\n");
   // Requisito: toda línea del .txt debe empezar por un punto (.)
   return body.split(/\r\n|\r|\n/).map(function(l){ return "."+l; }).join("\r\n");
@@ -2618,6 +2620,8 @@ function cardHtml(r){
       '<div class="fechafin">Fecha fin (igual a la de inicio): <span class="ffin" data-ffin="'+r.id+'">'+esc(r.fecha||"")+'</span></div>'+
       '<label class="full">Trabajo realizado por'+
         '<input type="text" data-id="'+r.id+'" data-f="tecnico" value="'+escAttr(r.fields.tecnico||"")+'" placeholder="Nombre del técnico (se ingresa manualmente si el reporte es antiguo)"></label>'+
+      '<label class="full">Trabajo recibido por'+
+        '<input type="text" data-id="'+r.id+'" data-f="recibido" value="'+escAttr(r.fields.recibido||"")+'" placeholder="Nombre de quien recibe el trabajo"></label>'+
     '</div>'+
     '<div class="rowactions">'+
       '<button class="btn" data-preview="'+r.id+'">'+(previewOpen?"Ocultar vista previa":"Vista previa")+'</button>'+

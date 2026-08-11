@@ -32,7 +32,8 @@ gradientes ni sombras marcadas).
    **solo esa plantilla**, con sus campos editables:
    - Fecha de inicio · Cómo se encontró el equipo · Falla presentada · Motivo del mantenimiento ·
      Descripción del trabajo realizado (incluye el procedimiento y el TAG) · Cómo se dejó el equipo ·
-     Qué equipos o patrones se utilizaron · **Fecha fin (igual a la de inicio)** · **Trabajo realizado por**.
+     Qué equipos o patrones se utilizaron · **Fecha fin (igual a la de inicio)** · **Trabajo realizado por** ·
+     **Trabajo recibido por** (manual, quien recibe el trabajo).
    - Varios campos se **rellenan solos** con los datos del instrumento (y quedan editables):
      - **Descripción**: termina con *"Calibrado en el rango de: … para una salida de: …"* (rango y salida
        tomados de la base). PT/PIT/LT añaden *"Datos de calibración se encuentran anexos a la orden de trabajo."*
