@@ -195,7 +195,7 @@
   <div id="rows"></div>
 </section>
 
-<footer>Funciona 100% en tu navegador · Ningún dato se envía a servidores · <span title="Fecha de compilación. Si no coincide con la última, recarga con Ctrl+Shift+R.">versión 2026-08-11 11:20</span></footer>
+<footer>Funciona 100% en tu navegador · Ningún dato se envía a servidores · <span title="Fecha de compilación. Si no coincide con la última, recarga con Ctrl+Shift+R.">versión 2026-08-11 13:53</span></footer>
 </div>
 <script>
 /*! xlsx.js (C) 2013-present SheetJS -- http://sheetjs.com */
@@ -2522,8 +2522,11 @@ function recompAuto(row){
     autoDesc="Procedimiento "+row.proc+" asociado al TAG "+row.tag+(row.nombre?(" - "+row.nombre):"")+"."+(pdesc?("\n"+pdesc):"");
     if(row.isValve){ autoDesc+="\n\nVerificación de posición (valores generados vs. posición real):\n"+valveTable(row.valFalla,row.valTecno); }
     if(SWITCH_DIR[row.key]){
-      // Switch de presión: prueba de repetibilidad con el SET (subiendo=PSH / bajando=PSL).
-      autoDesc+="\nSe realizaron pruebas de repetibilidad satisfactorias con el SET de:"+(row.rango?(" "+row.rango):"")+" "+SWITCH_DIR[row.key]+".";
+      // Switch de presión: la línea de repetibilidad con el SET (subiendo=PSH / bajando=PSL) REEMPLAZA
+      // el paso genérico de "pruebas repetitivas" del procedimiento, en su misma posición (sin duplicar).
+      var repet="Se realizaron pruebas de repetibilidad satisfactorias con el SET de:"+(row.rango?(" "+row.rango):"")+" "+SWITCH_DIR[row.key]+".";
+      var reRepet=/^-[^\n]*repetit[^\n]*$/im;
+      autoDesc = reRepet.test(autoDesc) ? autoDesc.replace(reRepet, "- "+repet) : (autoDesc+"\n"+repet);
     } else {
       autoDesc+="\n"+lineaCalib(row);
     }
