@@ -2494,6 +2494,8 @@ function recompAuto(row){
 }
 
 /* ---------- Texto de la plantilla ---------- */
+/* Una línea en blanco después de cada línea (requisito de la descripción del trabajo). Idempotente. */
+function conEnters(s){ return (s==null?"":String(s)).split(/\n+/).join("\n\n"); }
 function genText(row){
   var f=row.fields, fi=row.fecha||"";
   var body=[
@@ -2501,7 +2503,7 @@ function genText(row){
     "Cómo se encontró el equipo:", (f.comoEncontro||""), "",
     "Falla presentada:", (f.falla||""), "",
     "Motivo del mantenimiento:", (f.motivo||""), "",
-    "Descripción del trabajo realizado:", (f.descripcion||""), "",
+    "Descripción del trabajo realizado:", conEnters(f.descripcion), "",
     "Cómo se dejó el equipo:", (f.comoDejo||""), "",
     "¿Qué equipos o patrones se utilizaron?:", (f.equipos||""), "",
     "Fecha fin: "+fi, "",
