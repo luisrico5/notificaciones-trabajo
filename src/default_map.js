@@ -49,6 +49,13 @@ var DEFAULT_MAP_ARR = [
   "equipos": "Cilindro de aire comprimido, regulador de presión, mangueras, conectores, manómetro de referencia, multímetro digital, llaves (7/16, tubo, expansión), destornillador, cinta aislante"
  },
  {
+  "prefijo": "SHUTDOWN",
+  "nombre": "Prueba de shutdown en quemadores",
+  "proc": "P-SG-04554",
+  "descripcion": "Trabajo realizado:\n- Se verificó la calibración de los switches de presión de gas y aire de combustión\n- Se ajustó el setpoint del control de temperatura local por encima del sistema principal\n- Se simuló condiciones de baja y alta presión de gas para validar el apagado automático\n- Se provocó fallas por presión diferencial de aire para confirmar el cierre de seguridad\n- Se ejecutó pruebas de estanqueidad en las válvulas de shutoff mediante el método de burbujeo\n- Se normalizó los parámetros de operación y se retiró todos los dispositivos de prueba\n- Se registró los resultados de la actividad\nEl equipo respondió correctamente al procedimiento; las verificaciones coincidieron con los patrones de referencia dentro de tolerancia.",
+  "equipos": "Multímetro digital, llaves mixtas, destornilladores, perilleros, bomba manual de vacío, mangueras, recipiente con agua jabonosa"
+ },
+ {
   "prefijo": "PV",
   "nombre": "Valvula de control de presion",
   "proc": "P-SG-04580",
@@ -388,6 +395,14 @@ var DEFAULT_MAP_ARR = [
   "proc": "P-SG-04545",
   "descripcion": "Trabajo realizado:\n- Se determinó el tipo de entrada y configuración de termocupla en el controlador\n- Se verificó la precisión en tres puntos del rango usando bloque seco o termocupla patrón con calibrador\n- Se ejecutó ajustes de corrección de entrada (off-set) sin desviaciones fuera de tolerancia detectadas\n- Se validó la estabilidad del controlador en su punto de operación normal\n- Se etiquetó el instrumento, entregarlo a producción\nEl equipo respondió correctamente al procedimiento; las verificaciones coincidieron con los patrones de referencia dentro de tolerancia.",
   "equipos": "Termocupla patrón, calibradores Fluke (724, 725, 726, 744), horno de bloque seco, destornilladores, llaves mixtas, llave de expansión, llaves Allen"
+ },
+ {
+  "prefijo": "TV",
+  "nombre": "Valvula de control de temperatura",
+  "proc": "P-SG-04580",
+  "descripcion": "Trabajo realizado:\n- Se limpió el actuador e inspeccionar conexiones eléctricas y neumáticas\n- Se verificó posiciones físicas generando señales al 0, 25, 50, 75 y 100%\n- Se lubricó tornillería, eje de la válvula, tapas y uniones universales\n- Se validó funcionamiento con el cuarto de control y se entregó a producción\nEl equipo respondió correctamente al procedimiento; las verificaciones coincidieron con los patrones de referencia dentro de tolerancia.",
+  "equipos": "Generador Fluke, interfaz 475/Trex, destornilladores, llave expansiva, llaves de tubo, grasa, limpiador Aeropax, trapos",
+  "tipo": "valvula"
  },
  {
   "prefijo": "AT",

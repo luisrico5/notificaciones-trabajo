@@ -1,0 +1,16 @@
+Continuing conversation 414e11c7...
+Answer:
+OBJETO: Establecer los pasos para realizar la prueba de shutdown y estanqueidad
+en los quemadores de secado y calderas de la planta.
+ACTIVIDADES: Verificar la calibración de los switches de presión de gas y aire
+de combustión | Ajustar el setpoint del control de temperatura local por encima
+del sistema principal | Simular condiciones de baja y alta presión de gas para
+validar el apagado automático | Provocar fallas por presión diferencial de aire
+para confirmar el cierre de seguridad | Ejecutar pruebas de estanqueidad en las
+válvulas de shutoff mediante el método de burbujeo | Normalizar los parámetros
+de operación y retirar todos los dispositivos de prueba | Registrar los
+resultados de la actividad y formalizar el cierre de la orden en SAP.
+EQUIPOS: Multímetro digital, llaves mixtas, destornilladores, perilleros, bomba
+manual de vacío, mangueras, recipiente con agua jabonosa.
+
+Resumed conversation: 414e11c7-3db0-4245-b561-75df3d686d91

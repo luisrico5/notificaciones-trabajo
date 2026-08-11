@@ -60,6 +60,13 @@ var DEFAULT_MAP_ARR = [
   "equipos": "Cilindro de aire comprimido, regulador de presión, mangueras, conectores, manómetro de referencia, multímetro digital, llaves (7/16, tubo, expansión), destornillador, cinta aislante"
  },
  {
+  "prefijo": "SHUTDOWN",
+  "nombre": "Prueba de shutdown en quemadores",
+  "proc": "P-SG-04554",
+  "descripcion": "Trabajo realizado:\n- Se verificó la calibración de los switches de presión de gas y aire de combustión\n- Se ajustó el setpoint del control de temperatura local por encima del sistema principal\n- Se simuló condiciones de baja y alta presión de gas para validar el apagado automático\n- Se provocó fallas por presión diferencial de aire para confirmar el cierre de seguridad\n- Se ejecutó pruebas de estanqueidad en las válvulas de shutoff mediante el método de burbujeo\n- Se normalizó los parámetros de operación y se retiró todos los dispositivos de prueba\n- Se registró los resultados de la actividad\nEl equipo respondió correctamente al procedimiento; las verificaciones coincidieron con los patrones de referencia dentro de tolerancia.",
+  "equipos": "Multímetro digital, llaves mixtas, destornilladores, perilleros, bomba manual de vacío, mangueras, recipiente con agua jabonosa"
+ },
+ {
   "prefijo": "PV",
   "nombre": "Valvula de control de presion",
   "proc": "P-SG-04580",
@@ -401,6 +408,14 @@ var DEFAULT_MAP_ARR = [
   "equipos": "Termocupla patrón, calibradores Fluke (724, 725, 726, 744), horno de bloque seco, destornilladores, llaves mixtas, llave de expansión, llaves Allen"
  },
  {
+  "prefijo": "TV",
+  "nombre": "Valvula de control de temperatura",
+  "proc": "P-SG-04580",
+  "descripcion": "Trabajo realizado:\n- Se limpió el actuador e inspeccionar conexiones eléctricas y neumáticas\n- Se verificó posiciones físicas generando señales al 0, 25, 50, 75 y 100%\n- Se lubricó tornillería, eje de la válvula, tapas y uniones universales\n- Se validó funcionamiento con el cuarto de control y se entregó a producción\nEl equipo respondió correctamente al procedimiento; las verificaciones coincidieron con los patrones de referencia dentro de tolerancia.",
+  "equipos": "Generador Fluke, interfaz 475/Trex, destornilladores, llave expansiva, llaves de tubo, grasa, limpiador Aeropax, trapos",
+  "tipo": "valvula"
+ },
+ {
   "prefijo": "AT",
   "nombre": "Analizador/transmisor de gas",
   "proc": "P-SG-04632",
@@ -508,7 +523,7 @@ function defaultMapObj(){
   return o;
 }
 
-var STORE_KEY="noti_mapping_v9";
+var STORE_KEY="noti_mapping_v10";
 var MAP={};            // prefijo -> entry
 var SORTED_KEYS=[];    // claves ordenadas por longitud desc (para match más largo)
 var rows=[];           // filas cargadas
@@ -533,9 +548,9 @@ function escAttr(s){ return esc(s).replace(/"/g,"&quot;"); }
 
 function upNoAcc(s){ return norm(s).toUpperCase(); }   /* sin acentos, en mayúsculas */
 
-/* Códigos de CLASE/TIPO DE ORDEN (EI-5…, PM01, ZM02…). Mezclan letras y números pero se repiten
-   igual en todas las filas: nunca son el TAG del equipo. Añade aquí otros tipos si aparecen. */
-var RE_TIPO_ORDEN=/^(EI|PM|ZM|IW|MN)-?\d/;
+/* Códigos de CLASE/TIPO DE ORDEN (EI-5531, IN-5531, PM01, ZM02…). Mezclan letras y números pero se
+   repiten igual en todas las filas: nunca son el TAG del equipo. Añade aquí otros tipos si aparecen. */
+var RE_TIPO_ORDEN=/^(EI|IN|PM|ZM|IW|MN|XPM)-?\d/;
 function esTipoOrden(tok){ return RE_TIPO_ORDEN.test(upNoAcc(tok)); }
 
 /* Un token "parece TAG" si mezcla letras y números (PT-3110, 3110-PIT-001, PT3110)
@@ -608,8 +623,12 @@ function ajustaWT(k, denom){
   if(k==="WT" && MAP["WT-TORQUE"] && /\bTORQUE\b/.test(upNoAcc(denom))) return "WT-TORQUE";
   return k;
 }
+/* Prueba de shutdown en quemadores: se reconoce por el CONTENIDO de la orden ("shutdown"), no por
+   prefijo (el TAG suele ser el quemador HE-… o venir vacío). Tiene prioridad. */
+function esShutdown(denom){ return /SHUT\s?DOWN/.test(upNoAcc(denom)); }
 /* Si el TAG no resuelve, se buscan candidatos en el resto de la denominación. */
 function detectKey(tag, denom){
+  if(MAP["SHUTDOWN"] && esShutdown(denom)) return "SHUTDOWN";
   var k=matchPrefix(tag);
   if(!k){
     var c=prefixCandidates(sinTipoOrden(denom)), i;

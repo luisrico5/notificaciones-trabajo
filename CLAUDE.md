@@ -49,10 +49,13 @@ está en medio y el archivo se regenera).
   (PIC gana a PI/PC, TIT a TI/TT, VTRC, SOV a SV, …).
 - `tagOf(denom)`: el TAG es el **primer token que mezcla letras y números** (`PT-3110`, `3110-PT-001`).
   Cubre denominaciones tipo "TRANSMISOR DE PRESION PT-3110".
-- `RE_TIPO_ORDEN` / `esTipoOrden()` / `sinTipoOrden()`: los códigos de **clase/tipo de orden**
-  (`EI-5…`, `PM01`, `ZM…`, `IW…`, `MN…`) mezclan letras y números pero se repiten igual en todas las
-  filas — **nunca son TAG**. Se descartan en `tagOf`, `matchPrefix`, `detectKey` y en el desplegable.
-  Si aparece otro tipo de orden en los reportes, se añade a `RE_TIPO_ORDEN`.
+- `RE_TIPO_ORDEN` / `esTipoOrden()` / `sinTipoOrden()`: códigos de **clase/tipo de orden** y de **clase de
+  actividad** (`EI-5531`, `IN-5531`, `PM01`, `ZM…`, `IW…`, `MN…`, `XPM7`) que mezclan letras y números
+  pero se repiten igual en todas las filas — **nunca son TAG**. Se descartan en `tagOf`, `matchPrefix`,
+  `detectKey` y en el desplegable. Si aparece otro código repetido, se añade a `RE_TIPO_ORDEN`.
+- `esShutdown(denom)` + entrada **`SHUTDOWN`**: si la orden dice "shutdown" (prueba de shutdown en
+  quemadores), `detectKey` la enruta por **contenido** a `SHUTDOWN` → `P-SG-04554`, con prioridad sobre el
+  prefijo (el TAG suele ser el quemador `HE-…` o venir vacío).
 - `matchPrefix(tag)` / `detectKey(tag,denom)`: resuelven el prefijo en este orden —
   (1) **exacta** sobre las letras iniciales, (2) **variante ISA** quitando la "I" de indicador
   (`LIT→LT`, `FIT→FT`, `AIT→AT`, `PDIT→PDT`), (3) los mismos dos pasos sobre cada grupo de letras
@@ -156,8 +159,9 @@ está en medio y el archivo se regenera).
 - Nombre de archivo: `OT-TAG.txt` (TAG = primer token de la denominación).
 - Al **cambiar los datos por defecto** del mapeo, **sube la versión** `STORE_KEY` (`noti_mapping_vN`)
   para que el `localStorage` viejo del usuario no oculte los nuevos valores. **Valor actual: `noti_mapping_v7`**
-  (v4 PIT, v5 WT peso, v6 WT-TORQUE, v7 PSH/PSL, v8 limpieza DCS/SAP/ajuste-cero, v9 LIT). Otras claves de
-  `localStorage`: `noti_calib_v1` (base de calibración adjuntada) y `noti_session_v1` (sesión auto-guardada).
+  (v4 PIT, v5 WT peso, v6 WT-TORQUE, v7 PSH/PSL, v8 limpieza DCS/SAP/ajuste-cero, v9 LIT,
+  v10 SHUTDOWN + TV). Otras claves de `localStorage`: `noti_calib_v1` (base de calibración adjuntada) y
+  `noti_session_v1` (sesión auto-guardada).
 - **LIT** (transmisor indicador de nivel) es **entrada propia** con las mismas opciones de nivel que LT
   (`multi(...LEVEL)`; el técnico elige el procedimiento en el desplegable). Está en `CALIB_ANEXA` como LT.
 - **Enter tras cada línea de la descripción**: `recompAuto` normaliza `autoDesc` con `split(/\n+/).join("\n\n")`,

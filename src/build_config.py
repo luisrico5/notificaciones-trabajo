@@ -21,9 +21,9 @@ def parse(code):
             'actividades': [clean(a) for a in mm.group(2).split('|') if clean(a)],
             'equipos': clean(mm.group(3))}
 
-CODES = ['04533','04540','04541','04542','04544','04545','04551','04552','04553','04563','04564',
-         '04565','04566','04571','04572','04573','04574','04576','04580','04585','04586','04618',
-         '04619','04620','04632','04635']
+CODES = ['04533','04540','04541','04542','04544','04545','04551','04552','04553','04554','04563',
+         '04564','04565','04566','04571','04572','04573','04574','04576','04580','04585','04586',
+         '04618','04619','04620','04632','04635']
 D = {c: parse(c) for c in CODES}
 
 # ---- Convertir actividad imperativa -> pasado afirmativo ("Se ...") ----
@@ -97,7 +97,8 @@ PROC_NAME = {
  '04620':'Torque centrifugas CE-1H a 7H y F-3423',
  '04540':'RTD (Pt100)','04541':'Termocupla J/K','04542':'Termometros bimetalicos',
  '04544':'Transmisores de temperatura','04545':'Controles de temperatura','04551':'Transmisores de presion',
- '04552':'Manometros','04553':'Switch de presion','04563':'Flujo DP (presion diferencial)','04564':'Flujo masico (Coriolis)',
+ '04552':'Manometros','04553':'Switch de presion','04554':'Prueba de shutdown en quemadores',
+ '04563':'Flujo DP (presion diferencial)','04564':'Flujo masico (Coriolis)',
  '04565':'Flujo vortex','04566':'Flujo magnetico','04571':'Nivel DP (presion diferencial)',
  '04572':'Nivel radar de antena','04573':'Nivel MTS (tanques salchicha)','04574':'Nivel radar de onda guiada',
  '04576':'Nivel Drexelbrook','04580':'Valvulas de control','04585':'Valvula on-off (interiores)',
@@ -132,6 +133,8 @@ arr = [
  single('PIT','Transmisor indicador de presion','04551'),
  single('PSH','Switch de presion (alta)','04553'),
  single('PSL','Switch de presion (baja)','04553'),
+ # Prueba de shutdown en quemadores: se enruta por CONTENIDO (la orden dice "shutdown"), no por prefijo.
+ single('SHUTDOWN','Prueba de shutdown en quemadores','04554'),
  valve('PV','Valvula de control de presion'),
  multi('FT','Transmisor de flujo',FLOW),
  multi('FE','Elemento de flujo',FLOW),
@@ -152,6 +155,7 @@ arr = [
  single('TI','Indicador de temperatura (termometro)','04542'),
  single('TIC','Controlador indicador de temperatura','04545'),
  single('TC','Controlador de temperatura','04545'),
+ valve('TV','Valvula de control de temperatura'),
  single('AT','Analizador/transmisor de gas','04632'),
  single('AI','Indicador de analisis de gas','04632'),
  combined('SOV','Valvula solenoide on-off'),
