@@ -64,8 +64,30 @@ def past_bullet(act):
     return re.sub(r'\s+', ' ', s).strip()
 
 CLOSE = 'El equipo respondió correctamente al procedimiento; las verificaciones coincidieron con los patrones de referencia dentro de tolerancia.'
+
+# --- Limpieza aplicada a TODAS las descripciones (bullets) ---
+# 1) "la señal ... en el DCS o PLC" -> solo "DCS".
+# 2) Eliminar cualquier mención de SAP: se quita el/los segmento(s) (unidos por " y ") que la contienen;
+#    si el bullet queda vacío, se descarta.
+# 3) Eliminar el bullet COMPLETO que diga que se ejecutó un ajuste de cero/Zero.
+def clean_bullet(b):
+    low = b.lower()
+    if re.search(r'ajust\w*', low) and re.search(r'\b(cero|zero)\b', low):
+        return None                                   # (3) línea de ajuste de cero -> fuera
+    if 'sap' in low:                                  # (2) quitar mención de SAP
+        parts = [p for p in re.split(r'\s+y\s+', b) if 'sap' not in p.lower()]
+        if not parts:
+            return None
+        b = ' y '.join(parts).rstrip(' ,;')
+    b = re.sub(r'DCS\s*(?:o|/)\s*PLC', 'DCS', b, flags=re.I)   # (1) DCS o PLC -> DCS
+    return b
 def bullets(code):
-    return '\n'.join('- ' + past_bullet(a) for a in D[code]['actividades'])
+    out = []
+    for a in D[code]['actividades']:
+        cb = clean_bullet(past_bullet(a))
+        if cb:
+            out.append('- ' + cb)
+    return '\n'.join(out)
 def pdesc(code):
     return 'Trabajo realizado:\n' + bullets(code) + '\n' + CLOSE
 

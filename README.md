@@ -74,8 +74,10 @@ tableros de NotebookLM *notificaciones* y *notificaciones 1*.
 - **Plantilla genérica** (sin procedimiento): PC, FC, LIC, LC, LG, SV, HV, HAD, VTRC, EX.
 
 Las **descripciones del trabajo** vienen redactadas en **pasado afirmativo** (indican lo que se hizo y
-que el equipo respondió correctamente al procedimiento; el usuario corrige lo que aplique). En el `.txt`
-generado **todas las líneas empiezan con un punto (`.`)**. El flujo es idéntico para Excel y pegado:
+que el equipo respondió correctamente al procedimiento; el usuario corrige lo que aplique). Se depuran
+automáticamente: "DCS o PLC" queda solo como **DCS**, se **omite toda mención de SAP** y se **quitan las
+líneas de ajuste de cero** (las de *verificación de cero* se conservan). En el `.txt` generado **todas
+las líneas empiezan con un punto (`.`)**. El flujo es idéntico para Excel y pegado:
 ambos muestran las plantillas editables (y las mismas preguntas/desplegables) antes de descargar.
 
 En la tarjeta **02 · Mapeo** puedes agregar/corregir prefijos, **exportar/importar** el mapeo

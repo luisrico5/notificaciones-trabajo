@@ -142,6 +142,11 @@ está en medio y el archivo se regenera).
 ## Convenciones / decisiones (no romper)
 - **Descripciones en pasado afirmativo**: "se hizo… el equipo respondió correctamente al procedimiento".
   Las genera `build_config.py` transformando el imperativo (verbo→pasado + neutraliza condicionales).
+- **Limpieza de bullets** (`clean_bullet` en `build_config.py`, aplica a TODAS las descripciones):
+  (1) "DCS o PLC" → **DCS**; (2) **se elimina toda mención de SAP** (se quita el segmento unido por " y "
+  que la contiene; si el bullet queda vacío, se descarta); (3) se **elimina el bullet completo** que diga
+  que se ejecutó **ajuste de cero/Zero** (las líneas de *verificación/indicación de cero* SÍ se conservan,
+  porque no son ajuste). Si se regenera desde NotebookLM, estas reglas se re-aplican solas.
 - **Cada línea del `.txt` empieza con `.`** (en `genText`, prefijo aplicado a todas las líneas).
 - **Fecha fin = fecha de inicio** siempre.
 - **Diseño**: estética *minimalismo editorial* (skill `diseñador/SKILL.md`): canvas bone `#F7F6F3`,
@@ -151,8 +156,8 @@ está en medio y el archivo se regenera).
 - Nombre de archivo: `OT-TAG.txt` (TAG = primer token de la denominación).
 - Al **cambiar los datos por defecto** del mapeo, **sube la versión** `STORE_KEY` (`noti_mapping_vN`)
   para que el `localStorage` viejo del usuario no oculte los nuevos valores. **Valor actual: `noti_mapping_v7`**
-  (v4 PIT, v5 WT peso, v6 WT-TORQUE, v7 PSH/PSL). Otras claves de `localStorage`: `noti_calib_v1` (base de
-  calibración adjuntada) y `noti_session_v1` (sesión auto-guardada).
+  (v4 PIT, v5 WT peso, v6 WT-TORQUE, v7 PSH/PSL, v8 limpieza DCS/SAP/ajuste-cero). Otras claves de
+  `localStorage`: `noti_calib_v1` (base de calibración adjuntada) y `noti_session_v1` (sesión auto-guardada).
 - **PSH/PSL** (switches de presión) → `P-SG-04553`. `SWITCH_DIR={PSH:"subiendo",PSL:"bajando"}`: la
   descripción añade "Se realizaron pruebas de repetibilidad satisfactorias con el SET de: &lt;rango&gt;
   &lt;subiendo|bajando&gt;." (no hay PSH/PSL en la base → el valor del SET se llena a mano). En vez de la
