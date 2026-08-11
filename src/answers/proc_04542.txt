@@ -1,0 +1,17 @@
+Continuing conversation 414e11c7...
+Answer:
+OBJETO: Establecer los pasos para realizar la verificación y ajuste de 
+termómetros bimetálicos en las plantas de proceso [1].
+ACTIVIDADES: Desmontar el equipo del sitio verificando la presencia de 
+termopozo y trasladarlo al taller [2] | Realizar limpieza técnica de la 
+carátula y el bulbo para eliminar residuos [3] | Verificar la precisión 
+comparando lecturas contra un bloque seco al 0%, 50% y 100% del rango [4, 5] | 
+Ejecutar ajustes mediante el tornillo posterior en caso de detectar 
+desviaciones [6] | Reinstalar el instrumento asegurando la visibilidad de la 
+carátula y su correcta operación [7] | Formalizar la entrega a producción y 
+registrar el reporte técnico en el sistema SAP [7].
+EQUIPOS: Llave para tubo, llave de expansión, destornillador de pala, cinta 
+aislante, calibradores Fluke (744, 726, 725, 705), multímetro digital, bloque 
+seco [8].
+
+Resumed conversation: 414e11c7-3db0-4245-b561-75df3d686d91

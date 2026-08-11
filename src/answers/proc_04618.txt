@@ -1,0 +1,16 @@
+Continuing conversation 38848ec8...
+Answer:
+OBJETO: Establecer los pasos para la verificación y ajuste del transmisor de
+torque de la centrífuga CE-6H.
+ACTIVIDADES: Desenergizar el motor y retirar el pin de unión del sensor al eje
+| Ajustar el cero del transmisor a 4 mA con el sensor de torque libre |
+Instalar la varilla de referencia y aplicar las pesas patrones correspondientes
+| Configurar el span mediante los switches de la tarjeta electrónica | Validar
+la indicación en el cuarto de control en diversos puntos de la escala | Retirar
+pesas, reinstalar el pin de acople y verificar la alineación | Entregar el
+equipo a producción y registrar el reporte técnico en SAP.
+EQUIPOS: Tester Fluke, pesas patrones, varilla de referencia, fuente de mV,
+llaves mixtas, llave para tubo, llave de expansión, destornillador, cinta
+aislante.
+
+Resumed conversation: 38848ec8-70c1-49d1-932d-1b6bdee5d555

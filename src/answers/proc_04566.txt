@@ -1,0 +1,14 @@
+Continuing conversation 38848ec8...
+Answer:
+OBJETO: Definir los pasos necesarios para realizar la revisión y mantenimiento 
+de los transmisores de flujo magnéticos [1].
+ACTIVIDADES: Retirar el fusible de potencia y abrir las tapas de conexión | 
+Reapretar conexiones de potencia, bobina, electrodos y terminales de tierra | 
+Limpiar y lubricar roscas, tornillería y uniones universales | Verificar 
+indicación de cero con tubo lleno y sin flujo | Realizar ajuste automático de 
+cero mediante interfaz HART si es necesario | Validar señal con el cuarto de 
+control y cerrar la orden en SAP [2-7].
+EQUIPOS: Tester Fluke, interfaz HART, resistor, llaves 9/16" y 15/16", llave 
+para tubo, destornillador de pala, grasa, desplazador de humedad [8].
+
+Resumed conversation: 38848ec8-70c1-49d1-932d-1b6bdee5d555

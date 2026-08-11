@@ -1,0 +1,16 @@
+Continuing conversation 38848ec8...
+Answer:
+OBJETO: Definir los pasos para la calibración, instalación y mantenimiento de 
+los transmisores de nivel MTS en tanques salchicha [1-4].
+ACTIVIDADES: Alimentar y configurar parámetros del transmisor en el taller para
+ajuste de Zero [5, 6] | Marcar puntos de prueba en la varilla y asegurar el 
+collarín de sujeción [7, 8] | Instalar el equipo y flotador en el tanque bajo 
+protocolos de seguridad y rescate [8-10] | Validar la indicación en el display 
+local, el multímetro y el sistema de control [11, 12] | Inspeccionar la 
+integridad física del flotador mediante pruebas de tintas penetrantes [13] | 
+Normalizar conexiones, retirar herramientas del tanque y registrar el 
+mantenimiento en SAP [14, 15].
+EQUIPOS: Fuente 24VDC, multímetro, comunicador Trex/475, llaves Allen y fijas, 
+trípode, arnés, grúa, tintas penetrantes [5, 9, 13, 16].
+
+Resumed conversation: 38848ec8-70c1-49d1-932d-1b6bdee5d555

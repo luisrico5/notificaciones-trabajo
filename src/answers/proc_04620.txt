@@ -1,0 +1,17 @@
+Continuing conversation 38848ec8...
+Answer:
+OBJETO: Establecer el procedimiento para la verificación y ajuste de los
+transmisores y sensores de torque en las centrífugas de la planta 2 [1].
+ACTIVIDADES: Desenergizar el equipo y retirar el pin de unión entre el sensor y
+el eje [2, 3] | Ajustar el valor de cero en el transmisor con el sensor de
+torque libre [3, 4] | Instalar la varilla de referencia y aplicar las pesas
+patrones correspondientes [5, 6] | Configurar el punto de span al torque máximo
+en el menú de calibración [6, 7] | Validar la indicación en el cuarto de
+control contra los valores de la tabla [7, 8] | Retirar la instrumentación de
+prueba y reinstalar el pin de acople asegurando su alineación [8, 9] | Entregar
+el equipo a producción y registrar el reporte de mantenimiento en SAP [9].
+EQUIPOS: Tester Fluke, pesas patrones secundarias, varilla de referencia (24
+in), fuente de mV, llaves mixtas, llave para tubo, llave de expansión,
+destornillador, cinta aislante [10, 11].
+
+Resumed conversation: 38848ec8-70c1-49d1-932d-1b6bdee5d555

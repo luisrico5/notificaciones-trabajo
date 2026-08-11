@@ -1,0 +1,20 @@
+Continuing conversation 414e11c7...
+Answer:
+OBJETO: Establecer los pasos necesarios para realizar la verificación, ajuste y
+calibración de los switches de presión en las plantas de proceso [1].
+ACTIVIDADES: Desconectar eléctricamente el equipo y retirarlo de la toma a
+proceso asegurando la despresurización [2-4] | Trasladar el instrumento al
+laboratorio para realizar limpieza técnica a tapas y sensores [4] | Acoplar el
+switch a un sistema de aire con manómetro de referencia y multímetro digital
+[5] | Verificar el punto de operación actual comparándolo contra el set de
+disparo definido [6-8] | Ajustar el tornillo de calibración hasta alcanzar el
+valor deseado [9] | Ejecutar pruebas repetitivas para confirmar la estabilidad
+del disparo y registrar los valores finales [9, 10] | Reinstalar el equipo en
+sitio validando la ausencia de fugas y la señal en el sistema de control [10,
+11] | Formalizar la entrega a producción y realizar el cierre de la orden en el
+sistema SAP [12].
+EQUIPOS: Cilindro de aire comprimido, regulador de presión, mangueras,
+conectores, manómetro de referencia, multímetro digital, llaves (7/16, tubo,
+expansión), destornillador, cinta aislante [2, 5, 13].
+
+Resumed conversation: 414e11c7-3db0-4245-b561-75df3d686d91

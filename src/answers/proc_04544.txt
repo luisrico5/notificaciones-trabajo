@@ -1,0 +1,17 @@
+Continuing conversation 414e11c7...
+Answer:
+OBJETO: Establecer los pasos necesarios para realizar la verificación y ajuste 
+de transmisores de temperatura en las plantas de proceso [1].
+ACTIVIDADES: Desmontar el transmisor del proceso previa desconexión eléctrica y
+realizar limpieza técnica a las piezas [2, 3] | Verificar la respuesta del 
+equipo generando valores al 0, 25, 50, 75 y 100% de su rango de medida [4-6] | 
+Ejecutar ajustes de Zero/Span, Sensor Trim o Calibration Exec si se detectan 
+desviaciones fuera de tolerancia [7-9] | Reinstalar el transmisor lubricando 
+roscas y validando la correcta indicación de temperatura en el cuarto de 
+control [10] | Formalizar la entrega del equipo a producción y cerrar la orden 
+de trabajo en el sistema SAP [10, 11].
+EQUIPOS: Tester Fluke 179, interfaz HART, calibradores de proceso 
+744/724/725/726, calentador de bloque seco, llaves de 9/16” y 15/16”, llave 
+para tubo, destornillador de pala, cinta aislante [12].
+
+Resumed conversation: 414e11c7-3db0-4245-b561-75df3d686d91

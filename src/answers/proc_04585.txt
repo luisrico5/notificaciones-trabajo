@@ -1,0 +1,14 @@
+Continuing conversation 38848ec8...
+Answer:
+OBJETO: Definir los pasos para realizar el cambio de interiores de las válvulas
+on/off tipo bola. [1]
+ACTIVIDADES: Desacoplar y bajar la válvula para traslado al taller | Desarmar 
+el equipo retirando vástago, bola y sellos previos | Realizar limpieza técnica 
+de componentes internos y externos | Armar la válvula instalando sellos nuevos 
+y ajustando con torquímetro | Ejecutar pruebas de presión en banco y validar 
+operación en campo | Entregar a producción y registrar el mantenimiento en el 
+sistema SAP. [2-8]
+EQUIPOS: Llaves mixtas, llaves Allen, llave de expansión, llave de tubo, 
+torquímetro, multímetro digital, banco de pruebas de presión. [5, 6, 9]
+
+Resumed conversation: 38848ec8-70c1-49d1-932d-1b6bdee5d555

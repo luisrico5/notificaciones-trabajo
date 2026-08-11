@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notificaciones de Trabajo</title>
+<style>
+  :root{
+    --canvas:#F7F6F3; --surface:#FFFFFF; --surface-2:#FBFBFA;
+    --ink:#2F3437; --ink-strong:#1A1A1A; --muted:#787774; --line:#EAEAEA; --line-soft:rgba(0,0,0,.06);
+    --accent:#111111; --accent-h:#333333;
+    --red-bg:#FDEBEC; --red-tx:#9F2F2D;
+    --blue-bg:#E1F3FE; --blue-tx:#1F6C9F;
+    --green-bg:#EDF3EC; --green-tx:#346538;
+    --yellow-bg:#FBF3DB; --yellow-tx:#956400;
+    --sans:'Switzer','Helvetica Neue','Segoe UI',system-ui,-apple-system,sans-serif;
+    --serif:'Newsreader','Playfair Display',Georgia,'Times New Roman',serif;
+    --mono:'JetBrains Mono','SF Mono','Consolas',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  body{margin:0;font-family:var(--sans);background:var(--canvas);color:var(--ink);line-height:1.55;font-size:15px}
+  .wrap{max-width:1680px;margin:0 auto;padding:48px 48px 64px}
+
+  /* ---- Header (editorial, sin gradiente ni hero de color) ---- */
+  header{margin:0 0 32px}
+  .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 12px}
+  header h1{font-family:var(--serif);font-weight:500;color:var(--ink-strong);margin:0 0 12px;
+    font-size:38px;line-height:1.1;letter-spacing:-.02em}
+  header p{color:var(--muted);margin:0;max-width:64ch;font-size:15px;line-height:1.55}
+  header p strong{color:var(--ink);font-weight:600}
+
+  /* ---- Cards / bento ---- */
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:24px 26px;margin:0 0 16px}
+  .toprow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start;margin:0 0 16px}
+  .toprow .card{margin:0}
+  .toprow .grid2{grid-template-columns:1fr}
+  @media(max-width:820px){.toprow{grid-template-columns:1fr}}
+  .sectionhd{display:flex;align-items:baseline;gap:12px;margin:0 0 18px}
+  .sectionhd .num{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.06em;padding-top:2px}
+  .sectionhd h2{font-family:var(--serif);font-weight:500;font-size:22px;letter-spacing:-.01em;margin:0;color:var(--ink-strong)}
+  .sectionhd .grow{flex:1}
+  h3{margin:20px 0 9px;font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-weight:600}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px 20px}
+  .grid2 .full{grid-column:1/-1}
+  @media(max-width:720px){.grid2{grid-template-columns:1fr}}
+
+  /* ---- Form controls (flat) ---- */
+  label.fld{display:block;font-size:12.5px;font-weight:600;margin:0 0 7px;color:var(--ink)}
+  input[type=text],input:not([type]),textarea,input[type=file],select{width:100%;padding:10px 12px;
+    border:1px solid var(--line);border-radius:6px;font:inherit;font-size:14px;background:var(--surface);color:var(--ink)}
+  select{cursor:pointer;font-weight:500}
+  textarea{resize:vertical;line-height:1.55;font-size:14px}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:#111;box-shadow:0 0 0 3px rgba(17,17,17,.06)}
+  input[type=file]{padding:8px 12px;background:var(--surface-2);cursor:pointer}
+  .hint{color:var(--muted);font-size:12.5px;line-height:1.55;margin:10px 0 0}
+  .hint b{color:var(--ink);font-weight:600}
+
+  /* ---- Buttons (solid charcoal CTA, flat outlines) ---- */
+  .btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);
+    padding:9px 15px;border-radius:6px;font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;margin-top:10px;
+    transition:background .18s ease,border-color .18s ease,transform .12s ease}
+  .btn:hover{background:var(--surface-2);border-color:#DADAD7}
+  .btn:active{transform:scale(.985)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.primary:hover{background:var(--accent-h);border-color:var(--accent-h)}
+  .btn.ghost{background:transparent}
+  .btn.ghost:hover{background:var(--surface-2)}
+  .btn.danger{color:var(--red-tx);border-color:#F3D5D6}
+  .btn.danger:hover{background:var(--red-bg)}
+  .btn.filelbl{position:relative;overflow:hidden}
+  .sep{display:inline-block;width:8px}
+
+  .rowflex{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+
+  /* ---- Badges / tags (pill, uppercase, muted pastels) ---- */
+  .badge{display:inline-block;font-family:var(--mono);font-size:10.5px;font-weight:600;padding:3px 10px;border-radius:999px;
+    background:var(--surface-2);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;border:1px solid var(--line-soft)}
+  .badge.ok{background:var(--green-bg);color:var(--green-tx);border-color:transparent}
+  .badge.warn{background:var(--yellow-bg);color:var(--yellow-tx);border-color:transparent}
+  .badge.info{background:var(--blue-bg);color:var(--blue-tx);border-color:transparent}
+
+  /* ---- Order card ---- */
+  .selectbar{margin:2px 0 16px}
+  .selectbar label{font-size:12.5px;font-weight:600;color:var(--ink)}
+  .selectbar select{margin-top:7px;font-size:14.5px;padding:11px 12px}
+  .emptysel{border:1px dashed var(--line);border-radius:10px;padding:28px 24px;text-align:center;color:var(--muted);
+    font-size:14px;background:var(--surface-2)}
+  .rowcard{border:1px solid var(--line);border-radius:10px;padding:20px;margin:0;background:var(--surface-2)}
+  .rowhead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px;
+    padding-bottom:14px;border-bottom:1px solid var(--line)}
+  .rowhead strong{font-weight:700;color:var(--ink-strong)}
+  .rowhead code{font-family:var(--mono);background:var(--surface);border:1px solid var(--line);padding:1px 7px;border-radius:4px;font-size:12.5px}
+  .fieldsgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px}
+  .fieldsgrid .full{grid-column:1/-1}
+  @media(max-width:720px){.fieldsgrid{grid-template-columns:1fr}}
+  .fieldsgrid label{display:block;font-size:12px;font-weight:600;color:var(--ink);margin-bottom:5px}
+  .ffin{font-weight:700;font-family:var(--mono)}
+  .fechafin{grid-column:1/-1;font-size:12.5px;color:var(--muted);background:var(--surface);border:1px solid var(--line);
+    padding:9px 12px;border-radius:6px}
+  .rowactions{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+  .rowactions .btn{margin-top:0}
+
+  /* ---- Preview ---- */
+  .previewwrap{margin-top:16px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+  .previewhd{background:var(--surface-2);padding:9px 14px;font-family:var(--mono);font-size:11px;font-weight:600;
+    text-transform:uppercase;letter-spacing:.08em;color:var(--muted);border-bottom:1px solid var(--line)}
+  .previewbox{margin:0;padding:16px;font-family:var(--mono);font-size:12.5px;line-height:1.6;white-space:pre-wrap;
+    word-break:break-word;max-height:440px;overflow:auto;background:var(--surface);color:var(--ink)}
+
+  /* ---- Mapping table ---- */
+  table.map{width:100%;border-collapse:collapse;font-size:13.5px}
+  table.map th,table.map td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  table.map th{color:var(--muted);font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+  table.map td.actions{white-space:nowrap;text-align:right}
+  .lnk{background:none;border:none;color:var(--ink);cursor:pointer;font:inherit;font-size:13px;font-weight:600;padding:2px 6px;text-decoration:underline;text-underline-offset:2px}
+  .lnk:hover{color:var(--ink-strong)}
+  .lnk.del{color:var(--red-tx)}
+  .maptbl-wrap{overflow-x:auto;max-height:340px;overflow-y:auto;border:1px solid var(--line);border-radius:8px}
+  .empty{color:var(--muted);font-size:14px;padding:10px 0}
+
+  footer{color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:.04em;text-align:center;margin-top:28px}
+
+  /* ---- Subtle scroll-entry motion ---- */
+  @keyframes riseIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+  .card{animation:riseIn .6s cubic-bezier(.16,1,.3,1) both}
+  .card:nth-of-type(2){animation-delay:.06s}
+  .card:nth-of-type(3){animation-delay:.12s}
+  @media(prefers-reduced-motion:reduce){.card{animation:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <p class="kicker">Mantenimiento · Instrumentación</p>
+  <h1>Notificaciones de Trabajo</h1>
+  <p>Adjunta un Excel o pega la tabla (OT + denominación de objeto técnico). El sistema identifica el TAG de cada orden, lo asocia a su procedimiento P-SG y genera una plantilla de notificación <strong>.txt</strong> por cada OT, editable y descargable.</p>
+</header>
+
+<div class="toprow">
+  <section class="card">
+    <div class="sectionhd"><span class="num">01</span><h2>Cargar datos</h2></div>
+    <div>
+      <label class="fld">Adjuntar archivo de Excel (.xlsx, .xls, .csv)</label>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+      <p class="hint" id="excelHint">Se lee la primera hoja. Columnas detectadas: <b>OT</b>, <b>denominación de objeto técnico</b>, número de equipo y fecha de inicio.</p>
+    </div>
+    <div style="margin-top:16px">
+      <label class="fld">O pegar la tabla desde el portapapeles</label>
+      <textarea id="pasteArea" rows="5" placeholder="Pega la tabla CON su fila de encabezados (puede tener las columnas que sea). Se usan solo OT, fecha de inicio y denominación de objeto técnico. Ej:&#10;OT&#9;Fecha inicio&#9;Equipo&#9;Denominación de objeto técnico&#10;123456&#9;04/07/2026&#9;EQ-55&#9;PT-1001 SEPARADOR"></textarea>
+      <button id="btnPaste" class="btn">Procesar pegado</button>
+    </div>
+    <p class="hint">Prefijos reconocidos como TAG: PT, PIT, PI, PC, PIC, FI, FIC, FT, FC, LT, LI, LIC, LC, VSP, SV, SOV, AT, AI, OFD, HAD, FV, VTRC, HV, TE, TT, TI, TIC, TC, FE, LG, TIT, PV, LV, EX (las variantes con “I” de indicador —LIT, FIT, AIT— usan el mismo procedimiento que LT, FT y AT). El TAG es el primer dato que mezcla letras y números, aunque lleve delante el área (3110-PT-001). Si el pegado trae una fecha, se usa como fecha de inicio y de fin; los campos se rellenan con el caso normal y todo queda editable.</p>
+  </section>
+
+  <section class="card">
+    <div class="sectionhd"><span class="num">02</span><h2>Mapeo TAG → Procedimiento</h2></div>
+    <p class="hint" style="margin-top:0">Agrega prefijos nuevos o corrige los existentes. Los cambios se guardan en <b>este navegador</b> y se aplican de inmediato a las órdenes cargadas.</p>
+    <div class="maptbl-wrap"><div id="mapList"></div></div>
+    <h3>Agregar / actualizar prefijo</h3>
+    <div class="grid2">
+      <div><label class="fld">Prefijo (TAG)</label><input type="text" id="mPref" placeholder="p. ej. FT"></div>
+      <div><label class="fld">Procedimiento (P-SG-…)</label><input type="text" id="mProc" placeholder="P-SG-04551"></div>
+      <div class="full"><label class="fld">Nombre / instrumento</label><input type="text" id="mNom" placeholder="Transmisor de flujo"></div>
+      <div class="full"><label class="fld">Descripción / puntos clave del procedimiento</label><textarea id="mDesc" rows="3"></textarea></div>
+      <div class="full"><label class="fld">Equipos o patrones utilizados</label><textarea id="mEq" rows="2"></textarea></div>
+    </div>
+    <button id="btnAddMap" class="btn primary">Guardar prefijo</button>
+    <span class="sep"></span>
+    <button id="btnExport" class="btn ghost">Exportar mapeo (JSON)</button>
+    <label class="btn ghost filelbl">Importar mapeo<input type="file" id="importMap" accept=".json" hidden></label>
+    <button id="btnReset" class="btn ghost danger">Restablecer a valores por defecto</button>
+
+    <h3 style="margin-top:22px">Base de calibración (rangos, salidas y patrones)</h3>
+    <p class="hint" style="margin-top:0">Los datos de <b>rango</b>, <b>salida</b> y <b>patrones utilizados</b> salen de la base DPCTrack2. Para actualizarlos a futuro, genera el archivo <code>datos_calibracion.json</code> con <code>src/extract_ranges.ps1</code> sobre la base nueva y adjúntalo aquí; se guarda en este navegador y se aplica a las órdenes cargadas. (El navegador no puede abrir el <code>.mdb</code> directamente, por eso se usa el archivo de datos.)</p>
+    <div id="calStatus" class="hint" style="margin-top:0"></div>
+    <label class="btn ghost filelbl">Adjuntar datos_calibracion.json<input type="file" id="importCalib" accept=".json,application/json" hidden></label>
+    <button id="btnCalibReset" class="btn ghost danger">Volver a los datos incrustados</button>
+  </section>
+</div>
+
+<section class="card" id="resultsCard" style="display:none">
+  <div class="sectionhd">
+    <span class="num">03</span>
+    <h2>Notificaciones</h2>
+    <span id="countBadge" class="badge"></span>
+    <span class="grow"></span>
+    <button id="btnClearSession" class="btn ghost" style="margin-top:0">Vaciar sesión</button>
+    <button id="btnZip" class="btn primary" style="margin-top:0">Descargar todos (.zip)</button>
+  </div>
+  <div id="rows"></div>
+</section>
+
+<footer>Funciona 100% en tu navegador · Ningún dato se envía a servidores · Generado localmente</footer>
+</div>
+<script>

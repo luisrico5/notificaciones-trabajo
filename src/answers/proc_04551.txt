@@ -1,0 +1,15 @@
+Continuing conversation 414e11c7...
+Answer:
+OBJETO: Establecer los pasos para la verificación y ajuste de transmisores de 
+presión análogos, Hart y Fieldbus [1].
+ACTIVIDADES: Desmontar el equipo y realizar limpieza técnica a tapas, tarjetas 
+y cápsula en el laboratorio [2, 3] | Verificar la linealidad comparando tres 
+puntos del rango con un patrón certificado [4-6] | Ejecutar ajustes de Zero, 
+Span o Trims en caso de desviaciones de tolerancia [7-10] | Reinstalar el 
+transmisor y validar la correcta señal en el DCS o PLC [11-13] | Realizar 
+pruebas de fugas y formalizar la entrega mediante reporte en SAP [14, 15].
+EQUIPOS: Calibradores Fluke, multímetro digital, interfaces Trex o 475, 
+estación generadora de presión, manómetros, comunicadores Hart/Fieldbus, llaves
+y destornilladores [16-18].
+
+Resumed conversation: 414e11c7-3db0-4245-b561-75df3d686d91

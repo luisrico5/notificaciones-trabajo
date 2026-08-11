@@ -1,0 +1,13 @@
+Continuing conversation 38848ec8...
+Answer:
+OBJETO: Definir los pasos para la verificación de los transmisores de flujo de 
+presión diferencial [1].
+ACTIVIDADES: Aislar y desmontar el transmisor del proceso | Realizar limpieza 
+técnica de componentes en laboratorio | Verificar el equipo en puntos de 0, 50 
+y 100% del rango | Ejecutar ajustes de Zero, Span o Trims ante desviaciones | 
+Reinstalar el equipo y normalizar válvulas en campo | Validar indicación en 
+sistema de control y cerrar orden en SAP [2-8].
+EQUIPOS: Llaves mixtas y de tubo, calibrador Fluke, multímetro, interfaz 
+Trex/475, comunicador Hart/Fieldbus, bomba de presión, manómetros [9].
+
+Resumed conversation: 38848ec8-70c1-49d1-932d-1b6bdee5d555

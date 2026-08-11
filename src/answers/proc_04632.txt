@@ -1,0 +1,15 @@
+Continuing conversation 414e11c7...
+Answer:
+OBJETO: Garantizar que los sensores de amoníaco operen dentro de los parámetros
+de confiabilidad para la detección de fugas [1].
+ACTIVIDADES: Tramitar permisos de trabajo y solicitar el equipo a producción 
+mediante la orden de trabajo [2] | Realizar la verificación de cero en modo 
+calibración empleando gas de referencia o aire atmosférico [3-5] | Ejecutar la 
+verificación de span aplicando gas patrón y esperando la estabilización de la 
+medida [6, 7] | Normalizar el detector, lubricar roscas y validar la señal en 
+el sistema de control [8] | Entregar el equipo a producción y registrar los 
+resultados obtenidos en el sistema SAP [8].
+EQUIPOS: Multímetro Fluke, llaves de tubo, destornilladores, imán, copa de 
+calibración, gases patrón, grasa, aeropak [2, 4, 6].
+
+Resumed conversation: 414e11c7-3db0-4245-b561-75df3d686d91

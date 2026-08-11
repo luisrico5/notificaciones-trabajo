@@ -1,0 +1,18 @@
+Continuing conversation 414e11c7...
+Answer:
+OBJETO: Establecer los pasos necesarios para realizar la verificación de las 
+lecturas de los elementos sensores de temperatura tipo RTD en las plantas de 
+proceso [1].
+ACTIVIDADES: Desmontar la RTD previa desconexión eléctrica y verificación de la
+existencia de termopozo | Realizar pruebas de impedancia y verificación de 
+linealidad en cinco puntos del rango usando bloque seco | Evaluar errores de 
+medición y sustituir el sensor si excede la tolerancia permitida de 0.5°C o 1°C
+| Reinstalar el equipo garantizando el contacto con el fondo del termopozo y 
+reconectar señales | Validar la correcta indicación en el cuarto de control 
+comparando con los valores medidos en campo | Entregar el equipo a producción y
+registrar el reporte técnico de los resultados en el sistema SAP [2-7].
+EQUIPOS: Multímetro Fluke, calibradores de proceso (724, 725, 726, 744), horno 
+de bloque seco, llaves de tubo, destornilladores, cinta aislante, waipes, 
+aeropax, grasa [4, 8].
+
+Resumed conversation: 414e11c7-3db0-4245-b561-75df3d686d91

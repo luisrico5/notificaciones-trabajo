@@ -1,0 +1,17 @@
+Continuing conversation 38848ec8...
+Answer:
+OBJETO: Definir los pasos para la verificación y ajuste de los transmisores de
+torque en las centrífugas CE-8H, CE-9H, F-3424 y F-3425. [1, 2]
+ACTIVIDADES: Desenergizar el motor y retirar el brazo de apoyo de la celda de
+carga | Conectar un multímetro en serie para monitorear la señal de 4-20 mA |
+Ajustar el cero a 4 mA en el procesador con la celda libre de carga | Aplicar
+tensión con el dinamómetro hasta alcanzar el valor de span especificado |
+Ejecutar el ajuste de span a 20 mA a través del menú del transmisor | Validar
+la indicación en el cuarto de control y retirar el dinamómetro | Normalizar la
+posición de la celda de carga y reinstalar el brazo de apoyo | Entregar equipo
+a producción y registrar el reporte técnico en el sistema SAP. [3-13]
+EQUIPOS: Tester Fluke, dinamómetro con soportería, varillas tensoras, llaves
+mixtas (9/16, 7/16, 1/2, 3/4), llave para tubo, llave de expansión,
+destornillador de pala, cinta aislante. [14, 15]
+
+Resumed conversation: 38848ec8-70c1-49d1-932d-1b6bdee5d555

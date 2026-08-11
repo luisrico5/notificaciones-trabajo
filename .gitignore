@@ -1,0 +1,6 @@
+# Base de calibración DPCTrack2 y binarios del programa — NO publicar (contienen datos y la clave).
+20260810_dpctrack2_backup.mdb
+*.mdb
+zzz/
+
+# Los rangos ya quedan incrustados en index.html; la base no se necesita para el sitio.

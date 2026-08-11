@@ -1,0 +1,18 @@
+Continuing conversation 414e11c7...
+Answer:
+OBJETO: Establecer los pasos para la verificación y ajuste de los tanques de
+pesada que utilizan transmisores de peso DXP-40 (BLH) [1].
+ACTIVIDADES: Verificar que el tanque esté vacío y consultar el rango del
+instrumento en el sistema de control [2] | Limpiar el transmisor y revisar el
+estado de las conexiones eléctricas y del cableado [3] | Medir la salida en
+milivoltios de cada celda y la corriente de señal en miliamperios [3] |
+Instalar la plataforma y aplicar pesas patrones hasta alcanzar cerca del 100%
+del rango [4] | Validar las lecturas locales y en el DCS comparándolas contra
+el valor del patrón certificado [4] | Ejecutar ajustes electrónicos de Zero o
+Span en caso de desviaciones superiores al 0.5% [3-5] | Retirar los
+patrones y formalizar el cierre de la actividad mediante el reporte técnico en
+SAP [5, 6].
+EQUIPOS: Pesas patrones, plataforma de pesaje, multímetro Fluke, llaves mixtas,
+destornilladores, raches, copas, waipe, aeropak, grasa [7].
+
+Resumed conversation: 414e11c7-3db0-4245-b561-75df3d686d91

@@ -1,0 +1,15 @@
+Continuing conversation 414e11c7...
+Answer:
+OBJETO: Establecer los pasos para la verificación y ajuste de los controladores
+de temperatura en hornos de laboratorio y extrusoras [1].
+ACTIVIDADES: Determinar el tipo de entrada y configuración de termocupla en el 
+controlador [2] | Verificar la precisión en tres puntos del rango usando bloque
+seco o termocupla patrón con calibrador [2-5] | Ejecutar ajustes de corrección 
+de entrada (off-set) ante desviaciones detectadas [3, 5, 6] | Validar la 
+estabilidad del controlador en su punto de operación normal [6] | Etiquetar el 
+instrumento, entregarlo a producción y registrar el cierre en SAP [6].
+EQUIPOS: Termocupla patrón, calibradores Fluke (724, 725, 726, 744), horno de 
+bloque seco, destornilladores, llaves mixtas, llave de expansión, llaves Allen 
+[7].
+
+Resumed conversation: 414e11c7-3db0-4245-b561-75df3d686d91

@@ -1,0 +1,16 @@
+Continuing conversation 38848ec8...
+Answer:
+OBJETO: Establecer los pasos para la verificación y ajuste de los transmisores 
+de nivel por presión diferencial en tanques [1].
+ACTIVIDADES: Aislar y desmontar el equipo del proceso para traslado al 
+laboratorio [2, 3] | Realizar limpieza técnica de componentes externos e 
+internos [3] | Verificar el instrumento en 0, 50 y 100% del rango de medida 
+[4-6] | Ejecutar ajustes de Zero, Span o Trims ante desviaciones encontradas 
+[7-10] | Reinstalar el equipo, normalizar válvulas y validar funcionamiento en 
+DCS [10-12] | Registrar resultados de calibración y cerrar la orden de trabajo 
+en SAP [13].
+EQUIPOS: Bombas de presión, multímetro Fluke, comunicador HART (Trex/475), 
+fuente 24VDC, resistencia 250Ω, llaves mixtas, llave para tubo, 
+destornilladores, grasa [14].
+
+Resumed conversation: 38848ec8-70c1-49d1-932d-1b6bdee5d555

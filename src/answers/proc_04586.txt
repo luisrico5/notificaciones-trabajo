@@ -1,0 +1,14 @@
+Continuing conversation 38848ec8...
+Answer:
+OBJETO: Establecer los pasos necesarios para realizar la verificación y el 
+mantenimiento de los micros de posición de las válvulas ON/OFF [1].
+ACTIVIDADES: Verificar indicación en DCS y abrir la caja de micros con 
+precaución [2] | Medir voltajes de operación y reemplazar switches o imanes 
+defectuosos si es necesario [2, 3] | Normalizar actuadores mecánicos y 
+solicitar pruebas de movimiento al cuarto de control [3, 4] | Aplicar grasa en 
+tornillería y cerrar la caja de conexiones [5] | Confirmar indicación correcta 
+en campo, entregar a producción y registrar reporte en SAP [4, 6].
+EQUIPOS: Llave para tubo, llave de expansión, destornillador de pala, dado 
+7/16”, llave allen 7/32, multímetro digital, grasa [5, 7].
+
+Resumed conversation: 38848ec8-70c1-49d1-932d-1b6bdee5d555

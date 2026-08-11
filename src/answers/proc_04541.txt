@@ -1,0 +1,17 @@
+Continuing conversation 414e11c7...
+Answer:
+OBJETO: Establecer los pasos necesarios para verificar las lecturas de los 
+elementos sensores termocuplas tipo J y K en las plantas de proceso [1].
+ACTIVIDADES: Desmontar la termocupla previa verificación de termopozo y 
+registro de lectura actual en el cuarto de control | Identificar el tipo de 
+sensor (J o K) mediante pruebas de magnetismo utilizando un imán | Realizar la 
+verificación en taller comparando tres puntos del rango con un horno de bloque 
+seco y calibrador certificado | Reinstalar el sensor garantizando inmersión 
+total y validar la correcta señal en el sistema de control | Entregar el equipo
+a producción y registrar el reporte técnico de los resultados en el sistema SAP
+[2-7].
+EQUIPOS: Multímetro, calibradores Fluke (724, 725, 726, 744), horno de bloque 
+seco, imán, llaves de tubo, destornilladores, cinta aislante, waipe, aeropak, 
+grasa [8, 9].
+
+Resumed conversation: 414e11c7-3db0-4245-b561-75df3d686d91

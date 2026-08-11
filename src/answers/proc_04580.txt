@@ -1,0 +1,15 @@
+Continuing conversation 38848ec8...
+Answer:
+OBJETO: Establecer los pasos para la verificación y mantenimiento de las 
+válvulas de control con posicionadores neumáticos y digitales [1].
+ACTIVIDADES: Limpiar el actuador e inspeccionar conexiones eléctricas y 
+neumáticas | Verificar posiciones físicas generando señales al 0, 25, 50, 75 y 
+100% | Ejecutar ajustes de Zero/Span o autocalibración según el tipo de 
+posicionador | Lubricar tornillería, eje de la válvula, tapas y uniones 
+universales | Validar funcionamiento con el cuarto de control y entregar a 
+producción | Registrar el reporte técnico de mantenimiento en el sistema SAP 
+[2-9].
+EQUIPOS: Generador Fluke, interfaz 475/Trex, destornilladores, llave expansiva,
+llaves de tubo, grasa, limpiador Aeropax, trapos [10].
+
+Resumed conversation: 38848ec8-70c1-49d1-932d-1b6bdee5d555

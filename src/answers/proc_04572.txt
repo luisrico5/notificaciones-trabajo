@@ -1,0 +1,13 @@
+Continuing conversation 38848ec8...
+Answer:
+OBJETO: Definir los pasos para realizar la revisión y mantenimiento de los 
+transmisores de nivel tipo radar de antena [1].
+ACTIVIDADES: Anotar valor de PV en el DCS y abrir cámara de conexiones [2] | 
+Limpiar sulfato, reapretar terminales y verificar conexión a tierra [3] | 
+Lubricar hilos de rosca de tapas y uniones universales [3, 4] | Validar 
+indicación local contra DCS y realizar prueba de loop [4, 5] | Entregar equipo 
+a producción y registrar reporte técnico en SAP [5, 6].
+EQUIPOS: Tester Fluke, interfaz HART, resistor, llaves (9/16”, 15/16”, de 
+tubo), destornillador de pala, grasa, desplazador de humedad [7].
+
+Resumed conversation: 38848ec8-70c1-49d1-932d-1b6bdee5d555

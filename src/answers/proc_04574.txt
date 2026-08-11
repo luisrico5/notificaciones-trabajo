@@ -1,0 +1,13 @@
+Continuing conversation 38848ec8...
+Answer:
+OBJETO: Definir los pasos para la revisión y mantenimiento de los transmisores 
+de nivel tipo radar de onda guiada [1].
+ACTIVIDADES: Registrar valor de PV y desconectar cableado de alimentación | 
+Limpiar sulfato, reapretar terminales y verificar conexión a tierra | Lubricar 
+hilos de rosca de tapas y uniones universales | Validar que la indicación local
+coincida con el cuarto de control | Realizar prueba de loop y entregar equipo a
+producción | Cerrar la orden de trabajo en el sistema SAP [2-6].
+EQUIPOS: Tester Fluke, interfaz HART, resistor, llaves (9/16”, 15/16”, de 
+tubo), destornillador de pala, grasa, desplazador de humedad [7].
+
+Resumed conversation: 38848ec8-70c1-49d1-932d-1b6bdee5d555

@@ -1,0 +1,15 @@
+Continuing conversation 38848ec8...
+Answer:
+OBJETO: Definir los pasos necesarios para realizar la revisión y mantenimiento 
+de los transmisores de flujo másico [1].
+ACTIVIDADES: Revisar soportería del sensor y reapretar conexiones de potencia y
+señal | Limpiar componentes con desplazador de humedad y lubricar roscas de 
+tapas | Verificar estado de alarmas en el display y color del LED | Realizar 
+ajuste de cero con tubería llena y flujo detenido | Almacenar respaldo de la 
+configuración con comunicador de campo | Validar indicación en el DCS y cerrar 
+orden en SAP [2-12].
+EQUIPOS: Tester Fluke, comunicador HART (475 o Trex), llaves 9/16" y 15/16", 
+llave para tubo, destornillador aislado, grasa, desplazador de humedad, 
+resistor [2, 5, 12-15].
+
+Resumed conversation: 38848ec8-70c1-49d1-932d-1b6bdee5d555

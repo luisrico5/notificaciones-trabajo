@@ -1,0 +1,15 @@
+Continuing conversation 38848ec8...
+Answer:
+OBJETO: Establecer los pasos para realizar la verificación y mantenimiento del 
+detector de incendio y llama FS24X [1].
+ACTIVIDADES: Aislar suministro desde DCS y abrir cámara de conexiones [2] | 
+Extraer módulo para revisar conexiones de potencia y alarma [3, 4] | Limpiar 
+superficies ópticas y lubricar roscas y uniones universales [5, 6] | Ejecutar 
+prueba de verificación con lámpara portátil inhibiendo alarmas [7, 8] | Validar
+funcionamiento mediante LEDs y salidas de relés [8, 9] | Entregar equipo y 
+cerrar orden de trabajo en SAP [10].
+EQUIPOS: Tester Fluke, llaves mixtas, llave para tubo, destornillador bornero, 
+cinta aislante, grasa, desplazador de humedad, lámpara de prueba portátil 
+TL-2055 [11].
+
+Resumed conversation: 38848ec8-70c1-49d1-932d-1b6bdee5d555

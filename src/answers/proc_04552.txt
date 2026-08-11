@@ -1,0 +1,15 @@
+Continuing conversation 414e11c7...
+Answer:
+OBJETO: Establecer los pasos para el mantenimiento y verificación de manómetros
+en las plantas de proceso [1].
+ACTIVIDADES: Desinstalar el manómetro bloqueando la válvula de proceso y 
+despresionando el sistema | Limpiar y lubricar mecanismos con aeropak para 
+eliminar la pereza antes de la prueba | Realizar calibración tomando lecturas 
+en puntos ascendentes y descendentes del rango | Ejecutar ajustes de cero, 
+ganancia o angularidad en caso de desviaciones superiores al 3% | Reinstalar el
+equipo con teflón, verificar ausencia de fugas y reportar en sistema SAP [2-8].
+EQUIPOS: Tester Fluke, bombas de presión, cilindros de aire comprimido, módulos
+de presión, llaves mixtas, llave para tubo, destornilladores, kit de 
+reparación, aeropak [2].
+
+Resumed conversation: 414e11c7-3db0-4245-b561-75df3d686d91

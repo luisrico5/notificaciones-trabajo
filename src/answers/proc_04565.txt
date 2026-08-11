@@ -1,0 +1,15 @@
+Continuing conversation 38848ec8...
+Answer:
+OBJETO: Definir los pasos necesarios para realizar la revisión y mantenimiento 
+de los transmisores de flujo Vortex [1].
+ACTIVIDADES: Limpiar componentes con desplazador de humedad y lubricar roscas 
+de tapas [2, 3] | Reapretar conexiones de potencia y señal con herramientas 
+aisladas [2, 3] | Limpiar y lubricar uniones universales y tornillos de acople 
+[3, 4] | Respaldar configuración del equipo mediante comunicador HART 475 o 
+Trex [4-6] | Validar indicación en el DCS y entregar a producción [4] | Cerrar 
+la orden de trabajo en el sistema SAP [4].
+EQUIPOS: Tester Fluke, comunicador HART (475/Trex), resistor, llaves 9/16" y 
+15/16", llave para tubo, destornillador de pala, grasa, desplazador de humedad 
+[5-7].
+
+Resumed conversation: 38848ec8-70c1-49d1-932d-1b6bdee5d555

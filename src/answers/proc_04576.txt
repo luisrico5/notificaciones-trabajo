@@ -1,0 +1,14 @@
+Continuing conversation 38848ec8...
+Answer:
+OBJETO: Establecer los pasos para verificar el estado del elemento sensor y la 
+electrónica de los transmisores de nivel Drexelbrook [1].
+ACTIVIDADES: Verificar el estado de la guaya y la resistencia de las conexiones
+a tierra | Comprobar que la impedancia del protector de transientes sea cercana
+a 50 ohmios | Realizar ajuste de cero con el silo o tolva vacía mediante 
+interfaz HART | Ejecutar ajuste de span con el equipo a nivel máximo | Validar 
+la indicación en el cuarto de control y entregar a producción | Registrar el 
+reporte técnico de mantenimiento en el sistema SAP [2-9].
+EQUIPOS: Llaves (allen, mixtas, expansión, de tubo), multímetro digital, 
+destornilladores, interfaz 475 o Trex, andamio, arnés [5, 10].
+
+Resumed conversation: 38848ec8-70c1-49d1-932d-1b6bdee5d555
