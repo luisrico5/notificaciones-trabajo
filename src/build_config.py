@@ -140,6 +140,7 @@ arr = [
  generic('FC','Controlador de flujo'),
  valve('FV','Valvula de control de flujo'),
  multi('LT','Transmisor de nivel',LEVEL),
+ multi('LIT','Transmisor indicador de nivel',LEVEL),
  multi('LI','Indicador de nivel',LEVEL),
  generic('LIC','Controlador indicador de nivel'),
  generic('LC','Controlador de nivel'),

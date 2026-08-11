@@ -61,7 +61,7 @@ tableros de NotebookLM *notificaciones* y *notificaciones 1*.
   TC/TIC→04545, AT/AI→04632, OFD→04635 (detector de llama).
 - **Con desplegable** (varias tecnologías, el técnico elige por orden):
   - **Flujo** (FT, FE, FI, FIC): DP 04563 · másico 04564 · vortex 04565 · magnético 04566.
-  - **Nivel** (LT, LI): DP 04571 · radar antena 04572 · MTS 04573 · onda guiada 04574 · Drexelbrook 04576.
+  - **Nivel** (LT, **LIT**, LI): DP 04571 · radar antena 04572 · MTS 04573 · onda guiada 04574 · Drexelbrook 04576.
   - **Elemento de temperatura** (TE): RTD 04540 · termocupla 04541.
 - **Válvulas de control** (PV, FV, LV → P-SG-04580): además preguntan **tipo de falla**
   (cerrada/abierta) y **tecnología de señal** (4-20 mA / Fieldbus) y generan la tabla

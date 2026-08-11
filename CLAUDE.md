@@ -156,8 +156,13 @@ está en medio y el archivo se regenera).
 - Nombre de archivo: `OT-TAG.txt` (TAG = primer token de la denominación).
 - Al **cambiar los datos por defecto** del mapeo, **sube la versión** `STORE_KEY` (`noti_mapping_vN`)
   para que el `localStorage` viejo del usuario no oculte los nuevos valores. **Valor actual: `noti_mapping_v7`**
-  (v4 PIT, v5 WT peso, v6 WT-TORQUE, v7 PSH/PSL, v8 limpieza DCS/SAP/ajuste-cero). Otras claves de
+  (v4 PIT, v5 WT peso, v6 WT-TORQUE, v7 PSH/PSL, v8 limpieza DCS/SAP/ajuste-cero, v9 LIT). Otras claves de
   `localStorage`: `noti_calib_v1` (base de calibración adjuntada) y `noti_session_v1` (sesión auto-guardada).
+- **LIT** (transmisor indicador de nivel) es **entrada propia** con las mismas opciones de nivel que LT
+  (`multi(...LEVEL)`; el técnico elige el procedimiento en el desplegable). Está en `CALIB_ANEXA` como LT.
+- **Enter tras cada línea de la descripción**: `recompAuto` normaliza `autoDesc` con `split(/\n+/).join("\n\n")`,
+  `cardHtml` muestra el campo con `conEnters(...)` y `genText` lo aplica al `.txt` (idempotente). Garantiza
+  una línea en blanco entre líneas aunque el campo esté editado o venga de una sesión previa.
 - **PSH/PSL** (switches de presión) → `P-SG-04553`. `SWITCH_DIR={PSH:"subiendo",PSL:"bajando"}`: la
   descripción añade "Se realizaron pruebas de repetibilidad satisfactorias con el SET de: &lt;rango&gt;
   &lt;subiendo|bajando&gt;." (no hay PSH/PSL en la base → el valor del SET se llena a mano). En vez de la

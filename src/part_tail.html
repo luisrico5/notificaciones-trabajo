@@ -244,6 +244,43 @@ var DEFAULT_MAP_ARR = [
   ]
  },
  {
+  "prefijo": "LIT",
+  "nombre": "Transmisor indicador de nivel",
+  "proc": "",
+  "opciones": [
+   {
+    "proc": "P-SG-04571",
+    "nombre": "Nivel DP (presion diferencial)",
+    "descripcion": "Trabajo realizado:\n- Se aisló y desmontar el equipo del proceso para traslado al laboratorio\n- Se realizó limpieza técnica de componentes externos e internos\n- Se verificó el instrumento en 0, 50 y 100% del rango de medida\n- Se reinstaló el equipo, normalizar válvulas y se validó funcionamiento en DCS\n- Se registró resultados de calibración\nEl equipo respondió correctamente al procedimiento; las verificaciones coincidieron con los patrones de referencia dentro de tolerancia.",
+    "equipos": "Bombas de presión, multímetro Fluke, comunicador HART (Trex/475), fuente 24VDC, resistencia 250Ω, llaves mixtas, llave para tubo, destornilladores, grasa"
+   },
+   {
+    "proc": "P-SG-04572",
+    "nombre": "Nivel radar de antena",
+    "descripcion": "Trabajo realizado:\n- Se anotó valor de PV en el DCS y abrir cámara de conexiones\n- Se limpió sulfato, reapretar terminales y se verificó conexión a tierra\n- Se lubricó hilos de rosca de tapas y uniones universales\n- Se validó indicación local contra DCS y se realizó prueba de loop\n- Se entregó equipo a producción\nEl equipo respondió correctamente al procedimiento; las verificaciones coincidieron con los patrones de referencia dentro de tolerancia.",
+    "equipos": "Tester Fluke, interfaz HART, resistor, llaves (9/16”, 15/16”, de tubo), destornillador de pala, grasa, desplazador de humedad"
+   },
+   {
+    "proc": "P-SG-04573",
+    "nombre": "Nivel MTS (tanques salchicha)",
+    "descripcion": "Trabajo realizado:\n- Se marcó puntos de prueba en la varilla y asegurar el collarín de sujeción\n- Se instaló el equipo y flotador en el tanque bajo protocolos de seguridad y rescate\n- Se validó la indicación en el display local, el multímetro y el sistema de control\n- Se inspeccionó la integridad física del flotador mediante pruebas de tintas penetrantes\n- Se normalizó conexiones, retirar herramientas del tanque\nEl equipo respondió correctamente al procedimiento; las verificaciones coincidieron con los patrones de referencia dentro de tolerancia.",
+    "equipos": "Fuente 24VDC, multímetro, comunicador Trex/475, llaves Allen y fijas, trípode, arnés, grúa, tintas penetrantes"
+   },
+   {
+    "proc": "P-SG-04574",
+    "nombre": "Nivel radar de onda guiada",
+    "descripcion": "Trabajo realizado:\n- Se registró valor de PV y desconectar cableado de alimentación\n- Se limpió sulfato, reapretar terminales y se verificó conexión a tierra\n- Se lubricó hilos de rosca de tapas y uniones universales\n- Se validó que la indicación local coincida con el cuarto de control\n- Se realizó prueba de loop y se entregó equipo a producción\nEl equipo respondió correctamente al procedimiento; las verificaciones coincidieron con los patrones de referencia dentro de tolerancia.",
+    "equipos": "Tester Fluke, interfaz HART, resistor, llaves (9/16”, 15/16”, de tubo), destornillador de pala, grasa, desplazador de humedad"
+   },
+   {
+    "proc": "P-SG-04576",
+    "nombre": "Nivel Drexelbrook",
+    "descripcion": "Trabajo realizado:\n- Se verificó el estado de la guaya y la resistencia de las conexiones a tierra\n- Se comprobó que la impedancia del protector de transientes sea cercana a 50 ohmios\n- Se ejecutó ajuste de span con el equipo a nivel máximo\n- Se validó la indicación en el cuarto de control y se entregó a producción\nEl equipo respondió correctamente al procedimiento; las verificaciones coincidieron con los patrones de referencia dentro de tolerancia.",
+    "equipos": "Llaves (allen, mixtas, expansión, de tubo), multímetro digital, destornilladores, interfaz 475 o Trex, andamio, arnés"
+   }
+  ]
+ },
+ {
   "prefijo": "LI",
   "nombre": "Indicador de nivel",
   "proc": "",
@@ -471,7 +508,7 @@ function defaultMapObj(){
   return o;
 }
 
-var STORE_KEY="noti_mapping_v8";
+var STORE_KEY="noti_mapping_v9";
 var MAP={};            // prefijo -> entry
 var SORTED_KEYS=[];    // claves ordenadas por longitud desc (para match más largo)
 var rows=[];           // filas cargadas
@@ -2160,8 +2197,8 @@ function aplicaTecnico(row){
 }
 
 /* Prefijos cuya descripción cierra avisando que la calibración va anexa a la orden.
-   Las variantes con "I" ya resuelven aquí: LIT->LT; PIT tiene entrada propia. */
-var CALIB_ANEXA={PT:1, PIT:1, LT:1};
+   PT, PIT, LT y LIT tienen entrada propia en el mapeo. */
+var CALIB_ANEXA={PT:1, PIT:1, LT:1, LIT:1};
 var NOTA_CALIB="Datos de calibración se encuentran anexos a la orden de trabajo.";
 /* Switches de presión: la prueba de repetibilidad se hace subiendo (PSH, alta) o bajando (PSL, baja). */
 var SWITCH_DIR={PSH:"subiendo", PSL:"bajando"};
@@ -2395,7 +2432,7 @@ function cardHtml(r){
       fieldBlock(r.id,"falla","Falla presentada",r.fields.falla)+
       fieldBlock(r.id,"motivo","Motivo del mantenimiento",r.fields.motivo)+
       fieldBlock(r.id,"comoDejo","Cómo se dejó el equipo",r.fields.comoDejo)+
-      fieldBlock(r.id,"descripcion","Descripción del trabajo realizado (incluye procedimiento y TAG)",r.fields.descripcion,true,16)+
+      fieldBlock(r.id,"descripcion","Descripción del trabajo realizado (incluye procedimiento y TAG)",conEnters(r.fields.descripcion),true,16)+
       fieldBlock(r.id,"equipos","¿Qué equipos o patrones se utilizaron?",r.fields.equipos,true,4)+
       '<div class="fechafin">Fecha fin (igual a la de inicio): <span class="ffin" data-ffin="'+r.id+'">'+esc(r.fecha||"")+'</span></div>'+
       '<label class="full">Trabajo realizado por'+
