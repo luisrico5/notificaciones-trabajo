@@ -2474,7 +2474,7 @@ function recompAuto(row){
   } else {
     autoDesc="Plantilla genérica (sin procedimiento asignado para el TAG "+row.tag+(row.nombre?(" - "+row.nombre):"")+"). Describa el trabajo de mantenimiento realizado sobre el equipo.";
   }
-  autoDesc+="\n";   // salto de línea al final de toda descripción
+  autoDesc=autoDesc.split(/\n+/).join("\n\n");   // una línea en blanco después de cada línea
   // Campo "¿Qué equipos o patrones se utilizaron?": si la base tiene los patrones del reporte más
   // reciente (TAG + descripción), se usan esos; si no, los equipos del procedimiento; si no, el aviso.
   var patTxt=patronesTexto(row);
