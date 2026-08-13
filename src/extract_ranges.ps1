@@ -1,9 +1,13 @@
 # extract_ranges.ps1 — Extrae de la base de calibración DPCTrack2 (.mdb Jet 4), por cada TAG:
 #   - rango (señal de entrada) y salida (señal de salida)  [tabla INSTSPEC, grupo primario]
 #   - patrones utilizados en el reporte de calibración MÁS RECIENTE  [CALIBRAT + CALTEST + TESTINST]
+#   - técnico, fecha e indicación de la nota del reporte más reciente
+#   - DATOS COMPLETOS DEL INFORME DE CALIBRACIÓN (TAG_REPORT): cabecera del instrumento, especificaciones
+#     por grupo (puntos nominales entrada/salida + límites + precisión) y patrones con detalle, para el
+#     generador de reportes de la pestaña 2 del dashboard.
 # y produce dos salidas con los MISMOS datos:
-#   1) inyecta `var TAG_RANGES={...}` en src/part_tail.html (datos por defecto incrustados en index.html)
-#   2) escribe c:\noti\datos_calibracion.json (portable) para adjuntar en el dashboard a futuro.
+#   1) inyecta `var TAG_RANGES={...}` y `var TAG_REPORT={...}` en src/part_tail.html
+#   2) escribe c:\noti\datos_calibracion.json (portable: {tags, reportes}) para adjuntar en el dashboard.
 #
 #   powershell -ExecutionPolicy Bypass -File src\extract_ranges.ps1 -Password "<clave>"
 #   powershell -ExecutionPolicy Bypass -File build.ps1
@@ -23,6 +27,7 @@ $ErrorActionPreference = "Stop"
 $Mdb = (Resolve-Path $Mdb).Path
 $tailPath = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "part_tail.html"
 $esES = [System.Globalization.CultureInfo]::GetCultureInfo("es-ES")
+$inv  = [System.Globalization.CultureInfo]::InvariantCulture
 
 function New-Conn {
   foreach ($p in @("Microsoft.ACE.OLEDB.16.0", "Microsoft.ACE.OLEDB.12.0")) {
@@ -65,6 +70,15 @@ function Num($v) {
   if ($null -eq $v -or $v -is [DBNull]) { return $null }
   return ([double]$v).ToString("0.####", $esES)   # coma decimal, sin ceros sobrantes (es-ES)
 }
+function NumInv($v) {   # número JSON (punto decimal) o $null
+  if ($null -eq $v -or $v -is [DBNull]) { return $null }
+  return [double]([double]$v).ToString("0.######", $inv)
+}
+function Str($v) { if ($null -eq $v -or $v -is [DBNull]) { return "" } return ([string]$v).Trim() }
+function DateDMY($v) {   # d/M/yyyy (como el informe DPCTrack: 26/4/2024) o ""
+  if ($null -eq $v -or $v -is [DBNull]) { return "" }
+  try { return ([datetime]$v).ToString("d/M/yyyy", $inv) } catch { return "" }
+}
 function Rango($lo, $hi, $unit) {   # "lo a hi unit" o "" si no hay rango real (nunca se inventa)
   $a = Num $lo; $b = Num $hi
   if ($null -eq $a -or $null -eq $b -or $a -eq $b) { return "" }
@@ -87,8 +101,9 @@ foreach ($r in $dt.Rows) {
 # --- Patrones utilizados en el reporte de calibración MÁS RECIENTE de cada instrumento ---
 # CALIBRAT = reportes (ITEMCODE, CalibrationDate); CALTEST = patrones por reporte; TESTINST = maestro.
 $conn2 = New-Conn
-$cal = Q $conn2 "SELECT ITEMCODE, CalibrationID, CalibrationDate, WHOCALIBRATED, NoteID FROM CALIBRAT WHERE ITEMTYPE='Instrument'"
-$latest = @{}   # ITEMCODE -> @{cid; date; by; hasDate; note}
+$cal = Q $conn2 ("SELECT ITEMCODE, CalibrationID, CalibrationDate, WHOCALIBRATED, NoteID, " +
+  "TEMPERATURE, HUMIDITY, CALIBRATIONTYPE, CALIBRATIONCERTIFICATENUMBER FROM CALIBRAT WHERE ITEMTYPE='Instrument'")
+$latest = @{}   # ITEMCODE -> @{cid; date; by; hasDate; note; temp; hum; ctype; cert}
 foreach ($r in $cal.Rows) {
   $code = [string]$r['ITEMCODE']; if ($code -eq '') { continue }
   $cid = [int]$r['CalibrationID']; $dv = $r['CalibrationDate']
@@ -97,7 +112,9 @@ foreach ($r in $cal.Rows) {
   if (-not $latest.ContainsKey($code) -or $d -gt $latest[$code].date -or ($d -eq $latest[$code].date -and $cid -gt $latest[$code].cid)) {
     $by = if ($r['WHOCALIBRATED'] -is [DBNull]) { '' } else { ([string]$r['WHOCALIBRATED']).Trim() }
     $nid = if ($r['NoteID'] -is [DBNull]) { $null } else { [int]$r['NoteID'] }
-    $latest[$code] = @{ cid = $cid; date = $d; by = $by; hasDate = $hasDate; note = $nid }
+    $latest[$code] = @{ cid = $cid; date = $d; by = $by; hasDate = $hasDate; note = $nid;
+      temp = (Str $r['TEMPERATURE']); hum = (Str $r['HUMIDITY']);
+      ctype = (Str $r['CALIBRATIONTYPE']); cert = (Str $r['CALIBRATIONCERTIFICATENUMBER']) }
   }
 }
 # Notas de calibración: NoteID -> texto. La indicación con que se dejó el equipo se extrae con regex
@@ -115,15 +132,23 @@ function IndicacionDe($nid) {
   if ($m.Success) { return ($m.Groups[1].Value -replace '\s+', ' ').Trim() }
   return ''
 }
-$ct = Q $conn2 "SELECT t.CalibrationID, t.TESTINSTRUMENTCODE, ti.TESTINSTRUMENTNAME FROM CALTEST t LEFT JOIN TESTINST ti ON t.TESTINSTRUMENTCODE=ti.TESTINSTRUMENTCODE"
+# Patrones con detalle completo (para TAG_REPORT) y simple (para TAG_RANGES), por CalibrationID.
+$ct = Q $conn2 ("SELECT t.CalibrationID, t.TESTINSTRUMENTCODE, t.LastCalibrationDate, t.NextCalibrationDate, " +
+  "ti.TESTINSTRUMENTNAME, ti.MANUFACTURER, ti.MODELNUMBER, ti.SERIALNUMBER " +
+  "FROM CALTEST t LEFT JOIN TESTINST ti ON t.TESTINSTRUMENTCODE=ti.TESTINSTRUMENTCODE")
 $conn2.Close()
-$byCid = @{}
+$byCid = @{}      # cid -> lista de [tag, name]           (TAG_RANGES)
+$byCidFull = @{}  # cid -> lista de [tag,name,mf,mo,sr,lastCal,nextCal]  (TAG_REPORT)
 foreach ($r in $ct.Rows) {
   $cid = [int]$r['CalibrationID']
-  if (-not $byCid.ContainsKey($cid)) { $byCid[$cid] = @() }
+  if (-not $byCid.ContainsKey($cid)) { $byCid[$cid] = @(); $byCidFull[$cid] = @() }
   $tag = ([string]$r['TESTINSTRUMENTCODE']).Trim()
-  $name = ([string]$r['TESTINSTRUMENTNAME']).Trim()
-  if ($tag -ne '') { $byCid[$cid] += , @($tag, $name) }
+  $name = (Str $r['TESTINSTRUMENTNAME'])
+  if ($tag -ne '') {
+    $byCid[$cid] += , @($tag, $name)
+    $byCidFull[$cid] += , @($tag, $name, (Str $r['MANUFACTURER']), (Str $r['MODELNUMBER']), (Str $r['SERIALNUMBER']),
+      (DateDMY $r['LastCalibrationDate']), (DateDMY $r['NextCalibrationDate']))
+  }
 }
 $conPat = 0
 foreach ($code in $latest.Keys) {
@@ -148,9 +173,74 @@ foreach ($k in @($mapa.Keys)) {
 }
 # Descartar entradas totalmente vacías (sin rango, salida, patrones ni técnico).
 foreach ($k in @($mapa.Keys)) { $e = $mapa[$k]; if ($e.r -eq '' -and $e.s -eq '' -and $e.p.Count -eq 0 -and $e.by -eq '') { $mapa.Remove($k) } }
-Write-Host ("Instrumentos con datos: " + $mapa.Count + " | con patrones: " + $conPat)
+Write-Host ("Instrumentos con datos (TAG_RANGES): " + $mapa.Count + " | con patrones: " + $conPat)
 
-# --- Serializar a JSON compacto por TAG: {"r":..,"s":..,"p":[[tag,desc],..]} ---
+# ==========================================================================================
+# ============  TAG_REPORT: datos completos del informe de calibración por TAG  =============
+# ==========================================================================================
+$conn3 = New-Conn
+# Cabecera del instrumento.
+$inst = @{}
+foreach ($r in (Q $conn3 ("SELECT INSTRUMENTCODE, INSTRUMENTNAME, COMPANYNAME, MANUFACTURER, MODELNUMBER, " +
+    "SERIALNUMBER, STATUS, CLASSIFICATION, LOCATION, BUILDING, DEPARTMENT, EQUIPMENTCODE FROM INSTRMNT")).Rows) {
+  $code = Str $r['INSTRUMENTCODE']; if ($code -eq '') { continue }
+  $inst[$code] = [ordered]@{
+    tag = $code; n = (Str $r['INSTRUMENTNAME']); co = (Str $r['COMPANYNAME']);
+    mf = (Str $r['MANUFACTURER']); mo = (Str $r['MODELNUMBER']); sr = (Str $r['SERIALNUMBER']);
+    st = (Str $r['STATUS']); cl = (Str $r['CLASSIFICATION']); lo = (Str $r['LOCATION']);
+    bu = (Str $r['BUILDING']); de = (Str $r['DEPARTMENT']); eq = (Str $r['EQUIPMENTCODE'])
+  }
+}
+# Especificaciones por grupo/punto: puntos nominales (entrada/salida), límites y precisión.
+$specRows = Q $conn3 ("SELECT INSTRUMENTCODE, GroupNumber, Position, InputSignal, INPUTSIGNALTYPE, OutputSignal, " +
+  "OUTPUTSIGNALTYPE, LowLimit, HighLimit, STATEDACCURACY, RangeAccuracyPct, ReadingAccuracyPct, PlusMinus " +
+  "FROM INSTSPEC ORDER BY INSTRUMENTCODE, GroupNumber, Position")
+$conn3.Close()
+$groups = @{}   # code -> (ordered) gn -> grupo
+foreach ($r in $specRows.Rows) {
+  $code = Str $r['INSTRUMENTCODE']; if ($code -eq '' -or -not $inst.ContainsKey($code)) { continue }
+  $gn = [int]$r['GroupNumber']
+  if (-not $groups.ContainsKey($code)) { $groups[$code] = [ordered]@{} }
+  if (-not $groups[$code].Contains([string]$gn)) {
+    $groups[$code][[string]$gn] = [ordered]@{
+      gn = $gn; na = ""; sa = (Str $r['STATEDACCURACY']);
+      ra = (NumInv $r['RangeAccuracyPct']); rd = (NumInv $r['ReadingAccuracyPct']); pm = (NumInv $r['PlusMinus']);
+      it = (Str $r['INPUTSIGNALTYPE']); ot = (Str $r['OUTPUTSIGNALTYPE']); pts = @()
+    }
+  }
+  $g = $groups[$code][[string]$gn]
+  $g.pts += , @((NumInv $r['InputSignal']), (NumInv $r['OutputSignal']), (NumInv $r['LowLimit']), (NumInv $r['HighLimit']))
+  if ($g.it -eq "") { $g.it = (Str $r['INPUTSIGNALTYPE']) }
+  if ($g.ot -eq "") { $g.ot = (Str $r['OUTPUTSIGNALTYPE']) }
+}
+# Ensamblar registros TAG_REPORT (solo instrumentos con especificaciones/puntos).
+$rep = [ordered]@{}
+foreach ($code in ($inst.Keys | Sort-Object)) {
+  if (-not $groups.ContainsKey($code)) { continue }
+  $k = NormTag $code; if ($k -eq '') { continue }
+  $rec = $inst[$code]
+  # Grupos ordenados por número.
+  $gl = @()
+  foreach ($gk in ($groups[$code].Keys | Sort-Object { [int]$_ })) { $gl += , $groups[$code][$gk] }
+  $rec['g'] = @($gl)
+  # Defaults del reporte más reciente (temp, humedad, tipo, certificado, técnico) + patrones con detalle.
+  if ($latest.ContainsKey($code)) {
+    $L = $latest[$code]
+    $rec['ct'] = $L.ctype; $rec['tp'] = $L.temp; $rec['hu'] = $L.hum; $rec['ce'] = $L.cert; $rec['by'] = $L.by
+    $cid = $L.cid
+    if ($byCidFull.ContainsKey($cid)) {
+      $seen = @{}; $lst = @()
+      foreach ($pp in $byCidFull[$cid]) { if (-not $seen.ContainsKey($pp[0])) { $seen[$pp[0]] = 1; $lst += , $pp } }
+      $rec['std'] = @($lst)
+    } else { $rec['std'] = @() }
+  } else {
+    $rec['ct'] = ''; $rec['tp'] = ''; $rec['hu'] = ''; $rec['ce'] = ''; $rec['by'] = ''; $rec['std'] = @()
+  }
+  $rep[$k] = $rec
+}
+Write-Host ("Instrumentos con informe (TAG_REPORT): " + $rep.Count)
+
+# --- Serializar TAG_RANGES (JSON compacto manual) ---
 function Esc($s) { ([string]$s) -replace '\\', '\\' -replace '"', '\"' }
 function TagJson($e) {
   $ps = foreach ($pp in $e.p) { '["' + (Esc $pp[0]) + '","' + (Esc $pp[1]) + '"]' }
@@ -160,18 +250,25 @@ function TagJson($e) {
 $lineas = foreach ($k in ($mapa.Keys | Sort-Object)) { '"' + $k + '":' + (TagJson $mapa[$k]) }
 $cuerpo = ($lineas -join ",`r`n")
 
+# --- Serializar TAG_REPORT (ConvertTo-Json, compacto) ---
+$repJson = ($rep | ConvertTo-Json -Depth 8 -Compress)
+
 # 1) Inyectar en part_tail.html (datos incrustados por defecto en index.html).
-$bloque = "var TAG_RANGES={" + "`r`n" + $cuerpo + "`r`n};"
 $tail = Get-Content -Raw -Encoding UTF8 $tailPath
+$bloque = "var TAG_RANGES={" + "`r`n" + $cuerpo + "`r`n};"
 $re = '(?s)(/\* TAG_RANGES:INICIO \*/).*?(/\* TAG_RANGES:FIN \*/)'
 if ($tail -notmatch $re) { throw "No encontre los marcadores TAG_RANGES en part_tail.html" }
-$nuevo = [regex]::Replace($tail, $re, { param($m) $m.Groups[1].Value + "`r`n" + $bloque + "`r`n" + $m.Groups[2].Value })
-Set-Content -Path $tailPath -Value $nuevo -Encoding UTF8 -NoNewline
+$tail = [regex]::Replace($tail, $re, { param($m) $m.Groups[1].Value + "`r`n" + $bloque + "`r`n" + $m.Groups[2].Value })
+$bloqueRep = "var TAG_REPORT=" + $repJson + ";"
+$reRep = '(?s)(/\* TAG_REPORT:INICIO \*/).*?(/\* TAG_REPORT:FIN \*/)'
+if ($tail -notmatch $reRep) { throw "No encontre los marcadores TAG_REPORT en part_tail.html" }
+$tail = [regex]::Replace($tail, $reRep, { param($m) $m.Groups[1].Value + "`r`n" + $bloqueRep + "`r`n" + $m.Groups[2].Value })
+Set-Content -Path $tailPath -Value $tail -Encoding UTF8 -NoNewline
 
 # 2) Escribir el archivo portable que el dashboard puede adjuntar a futuro para actualizar su escaneo.
 $jsonPath = Join-Path (Split-Path -Parent $tailPath) "..\datos_calibracion.json"
 $hoy = (Get-Date).ToString("yyyy-MM-dd")
-$json = '{"version":1,"generado":"' + $hoy + '","tags":{' + "`r`n" + $cuerpo + "`r`n}}"
+$json = '{"version":2,"generado":"' + $hoy + '","tags":{' + "`r`n" + $cuerpo + "`r`n},"+'"reportes":' + $repJson + '}'
 Set-Content -Path $jsonPath -Value $json -Encoding UTF8 -NoNewline
 Write-Host ("Generado: " + (Resolve-Path $jsonPath).Path)
 Write-Host "part_tail.html actualizado. Ahora: powershell -ExecutionPolicy Bypass -File build.ps1"

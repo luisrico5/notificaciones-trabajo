@@ -15,7 +15,10 @@ Procedimiento**; debajo, a ancho completo, **03 · Notificaciones** (aparece al 
 sigue una estética de minimalismo editorial (paleta cálida monocroma, tipografía serif en títulos, sin
 gradientes ni sombras marcadas).
 
-## Uso local
+La app tiene **dos pestañas** arriba: **Notificaciones** (generar las plantillas `.txt` de las órdenes) y
+**Reporte de calibración** (generar el informe de calibración en PDF de un instrumento; ver más abajo).
+
+## Uso local (pestaña Notificaciones)
 1. Doble clic en `index.html` (se abre en tu navegador).
 2. Carga los datos de una de estas dos formas:
    - **Adjuntar Excel** (`.xlsx`, `.xls`, `.csv`). Se lee la primera hoja. Detecta automáticamente
@@ -52,6 +55,26 @@ gradientes ni sombras marcadas).
    - Cuando termines, **Descargar todos (.zip)** genera todas las plantillas en un ZIP.
    - **Tu trabajo se guarda solo**: las órdenes cargadas y las ediciones se conservan en el navegador y se
      **restauran al reabrir**. **Vaciar sesión** (tarjeta 03) empieza de cero.
+
+## Reporte de calibración (pestaña 2)
+Genera el **INSTRUMENTO INFORME DE CALIBRACIÓN** en PDF, con la **misma estructura** que el que produce
+DPCTrack2, a partir de un TAG.
+1. Abre la pestaña **Reporte de calibración**, escribe el **TAG** (p. ej. `PT-U7122`) y pulsa **Buscar**.
+2. La app **autollena todo** desde la base de calibración: fabricante, modelo, serie, estado, ubicación,
+   departamento, empresa, tipo de calibración, certificado, temperatura, humedad, técnico, las
+   **especificaciones** (precisión, puntos nominales de entrada/salida y sus unidades) y los **patrones
+   utilizados** en el último reporte (con fabricante, modelo, serie y fechas de calibración). Todos esos
+   campos quedan **editables**.
+3. **Lo único que ingresas a mano son los valores de calibración**: por cada punto, **Enc. como** (as-found)
+   y **Dejado como** (as-left). Vienen prellenados con el valor nominal (calibración ideal); cambia solo los
+   que difieran.
+4. Automáticamente se calculan: la **salida nominal** (de la base), el **% de desviación** y el resultado
+   **Aprobado/Fallado** de cada punto (según los límites y el tipo de precisión de la base).
+5. Pulsa **Generar reporte (PDF)**: se abre el diálogo de impresión del navegador → elige **"Guardar como
+   PDF"**. El formato impreso es idéntico al informe original de DPCTrack (misma cabecera, cajas y tablas).
+
+> Los datos salen de la misma base incrustada (o del `datos_calibracion.json` adjunto). Si el TAG no está,
+> avisa y no inventa nada.
 
 ## Mapeo TAG → Procedimiento
 El mapeo ya viene **pre-cargado** con los procedimientos P-SG y sus puntos clave, extraídos de los

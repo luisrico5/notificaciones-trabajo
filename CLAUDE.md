@@ -7,8 +7,10 @@ Guía para trabajar en este proyecto. Lee también `README.md` (uso) y la memori
 App web de **un solo archivo** (`index.html`) que corre 100% en el navegador (sin servidor, offline).
 A partir de una tabla de Órdenes de Trabajo (columna **OT** + **denominación de objeto técnico** = TAG),
 asocia cada TAG a su **procedimiento P-SG-…** y genera una **plantilla de notificación `.txt`** por orden.
-Entrada por Excel o por pegado. Sin dependencias externas en runtime. UI en tres tarjetas: **01 Cargar
-datos** y **02 Mapeo** lado a lado (`.toprow`), y **03 Notificaciones** a ancho completo debajo.
+Entrada por Excel o por pegado. Sin dependencias externas en runtime. Dos pestañas arriba:
+**Notificaciones** (UI en tres tarjetas: **01 Cargar datos** y **02 Mapeo** lado a lado con `.toprow`, y
+**03 Notificaciones** a ancho completo debajo) y **Reporte de calibración** (generador del informe DPCTrack
+en PDF a partir de un TAG; ver sección de arquitectura).
 
 ## Estructura de archivos
 ```
@@ -24,7 +26,9 @@ src/
   default_map.js      <- Salida intermedia de build_config.py (referencia).
   answers/proc_*.txt  <- Resúmenes de cada procedimiento extraídos de NotebookLM (fuente del mapeo).
   extract_ranges.ps1  <- Lee el .mdb de calibración y vuelca por TAG {rango,salida,patrones,técnico,
-                         indicación} en part_tail.html; genera además datos_calibracion.json.
+                         indicación} (TAG_RANGES) y el informe completo (TAG_REPORT: cabecera,
+                         especificaciones por grupo con puntos/límites y patrones con detalle) en
+                         part_tail.html; genera además datos_calibracion.json ({tags, reportes}).
 datos_calibracion.json <- Datos de calibración portables (para adjuntar en la app). Generado.
 .gitignore            <- Excluye *.mdb y zzz/ (no publicar base ni binarios).
 20260810_dpctrack2_backup.mdb  <- Base DPCTrack2 (Jet 4, con contraseña; está en zzz\PasswordReset.exe). Fuente de datos. NO PUBLICAR.
@@ -107,6 +111,24 @@ está en medio y el archivo se regenera).
   El navegador **no** abre el `.mdb` directo (Access cifrado); por eso el puente es el `.json`.
   Regenerar: `powershell -File src\extract_ranges.ps1 -Mdb <base_nueva> -Password "<clave>"` (clave en
   `zzz\PasswordReset.exe`, por defecto de DPCTrack2) → adjuntar el `.json` **o** `build.ps1` para incrustar.
+- **Pestaña "Reporte de calibración"** (`TAG_REPORT` + funciones `rep*` + área `#reportPrint`): la app tiene
+  dos pestañas arriba — **Notificaciones** (todo lo anterior) y **Reporte de calibración**, un generador que
+  **replica el informe de DPCTrack** ("INSTRUMENTO INFORME DE CALIBRACIÓN") en PDF. El técnico digita un TAG,
+  `repLookup` lo busca en `TAG_REPORT` (o en `CAL_OVERRIDE.reportes` si hay `.json` adjunto) y autollena TODO
+  desde la base: cabecera (fabricante, modelo, serie, estado, ubicación, depto, empresa), especificaciones por
+  grupo (`sa` tipo de precisión, `ra`/`rd`/`pm`, unidades `it`/`ot`, puntos `pts=[inNom,outNom,lowLim,highLim]`)
+  y patrones del último reporte con detalle (`std=[code,name,mf,model,serial,lastCal,nextCal]`). Los defaults
+  de temp/humedad/tipo/certificado/técnico salen del reporte más reciente (`CALIBRAT`); la nota por defecto usa
+  el P-SG del mapeo (`procForTag`→`detectKey`). **Lo único que se ingresa a mano son los valores de calibración**
+  (Enc. como / Dejado como por punto); todo lo demás es editable pero prellenado. Cálculo automático:
+  **salida nominal** viene de la base; **% de desviación** = `desvPct` (para *Pct of Range* la base es la
+  **salida máxima** del grupo, así el límite coincide con `RangeAccuracyPct×salidaMax`; para *Pct of Reading*
+  es respecto al nominal); **Aprobado/Fallado** = `dentro` (usa los `LowLimit/HighLimit` de la base, que están
+  poblados al 100% en `INSTSPEC`). "Generar reporte" → `repBuildHtml` llena `#reportPrint` y `window.print()`
+  (imprimir a PDF). El CSS de `#reportPrint` (en `part_head.html`) está oculto en pantalla y visible en
+  `@media print`; usa serif Times, cabecera de dos columnas, cajas con borde y la regla azul de la empresa,
+  igual que el PDF original. `TAG_REPORT` se genera en el MISMO paso de `extract_ranges.ps1` (misma base) e
+  igual se incrusta y se incluye en `datos_calibracion.json` (`{tags, reportes}`, ahora `version:2`).
 - `ajustaWT(k,denom)`: **WT** comparte prefijo entre peso y torque. Si el nombre contiene "torque" se
   enruta a `WT-TORQUE` (entrada con 3 opciones por centrífuga: `P-SG-04618` CE-6H, `P-SG-04619`
   CE-8H/9H·F-3424/F-3425, `P-SG-04620` CE-1H…7H·F-3423); si no, se queda en peso (`WT` → `P-SG-04533`).
@@ -160,7 +182,8 @@ está en medio y el archivo se regenera).
 - Al **cambiar los datos por defecto** del mapeo, **sube la versión** `STORE_KEY` (`noti_mapping_vN`)
   para que el `localStorage` viejo del usuario no oculte los nuevos valores. **Valor actual: `noti_mapping_v7`**
   (v4 PIT, v5 WT peso, v6 WT-TORQUE, v7 PSH/PSL, v8 limpieza DCS/SAP/ajuste-cero, v9 LIT,
-  v10 SHUTDOWN + TV). Otras claves de `localStorage`: `noti_calib_v1` (base de calibración adjuntada) y
+  v10 SHUTDOWN + TV). Otras claves de `localStorage`: `noti_calib_v1` (base de calibración adjuntada;
+  el `.json` ahora es `version:2` = `{tags, reportes}`, y `reportes` alimenta la pestaña de reporte) y
   `noti_session_v1` (sesión auto-guardada).
 - **LIT** (transmisor indicador de nivel) es **entrada propia** con las mismas opciones de nivel que LT
   (`multi(...LEVEL)`; el técnico elige el procedimiento en el desplegable). Está en `CALIB_ANEXA` como LT.
@@ -198,8 +221,12 @@ scratchpad: `node --check` (sintaxis) y scripts que comprueban matcheo de prefij
 ISA, tipo de orden, tablas de válvula, prefijo `.`, pasado afirmativo, fechas (inicio=fin), autorrelleno
 por tipo, desplegable, rango/salida/patrones reales de la base, regla de 2 meses del técnico, indicación
 de la nota, y el ciclo guardar/restaurar sesión y override de base de calibración.
+Para la **pestaña de reporte**: se prueba `repLookup`/`repBuildState`/`desvPct`/`dentro`/`repBuildHtml`
+(0.00% e ideal→Aprobado, valor fuera de límite→Fallado, valor en el límite→% = precisión declarada) y se
+renderiza `#reportPrint` a PDF con Chrome headless (`--print-to-pdf`) para **comparar 1:1** con el informe
+de DPCTrack de referencia (`PT-U7122.pdf`).
 Verificación real: abrir `index.html`, pegar TAGs variados (PT, FT, FIC, PIC, PV, TE, SOV, WT, PIT-…) y
-comprobar rango/salida/patrones/técnico/indicación.
+comprobar rango/salida/patrones/técnico/indicación; en la pestaña de reporte, buscar un TAG y "Generar reporte".
 
 ## Pendiente
 - **Etapa 3**: publicar en GitHub + GitHub Pages (el usuario indicará el repositorio). Publicar SOLO

@@ -3,4 +3,7 @@
 *.mdb
 zzz/
 
+# PDFs de referencia (informes DPCTrack de ejemplo) — material de entrada, no del entregable.
+*.pdf
+
 # Los rangos ya quedan incrustados en index.html; la base no se necesita para el sitio.

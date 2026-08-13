@@ -131,6 +131,67 @@
   .card:nth-of-type(2){animation-delay:.06s}
   .card:nth-of-type(3){animation-delay:.12s}
   @media(prefers-reduced-motion:reduce){.card{animation:none}}
+
+  /* ---- Tabs (pestañas) ---- */
+  .tabs{display:flex;gap:4px;margin:0 0 24px;border-bottom:1px solid var(--line)}
+  .tab{appearance:none;background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;
+    padding:11px 18px;font:inherit;font-size:14.5px;font-weight:600;color:var(--muted);cursor:pointer;
+    font-family:var(--serif);letter-spacing:-.01em}
+  .tab:hover{color:var(--ink)}
+  .tab.active{color:var(--ink-strong);border-bottom-color:var(--accent)}
+  .tabpanel{display:none}
+  .tabpanel.active{display:block}
+
+  /* ---- Generador de reporte (formulario en pantalla) ---- */
+  .rgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 18px}
+  @media(max-width:900px){.rgrid{grid-template-columns:1fr 1fr}}
+  @media(max-width:620px){.rgrid{grid-template-columns:1fr}}
+  .rgrid label{display:block;font-size:11.5px;font-weight:600;color:var(--ink);margin-bottom:5px}
+  .rgrid input{padding:8px 10px;font-size:13.5px}
+  .rgrid .full{grid-column:1/-1}
+  .caltbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;margin-top:6px}
+  table.caltbl{width:100%;border-collapse:collapse;font-size:13px;min-width:640px}
+  table.caltbl th,table.caltbl td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:center;white-space:nowrap}
+  table.caltbl th{color:var(--muted);font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;font-weight:600;background:var(--surface-2)}
+  table.caltbl td:first-child,table.caltbl th:first-child{text-align:left}
+  table.caltbl input{width:82px;padding:6px 8px;font-size:13px;text-align:center;margin:0}
+  table.caltbl td.res-ok{color:var(--green-tx);font-weight:700}
+  table.caltbl td.res-bad{color:var(--red-tx);font-weight:700}
+  .grpblock{margin:18px 0 4px}
+  .grpblock h4{margin:0 0 8px;font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+
+  /* ---- Área de impresión: réplica del informe DPCTrack (oculta en pantalla) ---- */
+  #reportPrint{display:none}
+  @media print{
+    .wrap{display:none !important}
+    #reportPrint{display:block !important}
+    @page{size:letter;margin:14mm}
+  }
+  #reportPrint{font-family:'Times New Roman',Georgia,serif;color:#000;font-size:11pt;line-height:1.32;
+    background:#fff;padding:8mm;max-width:190mm;margin:0 auto}
+  #reportPrint .rp-title{text-align:center;font-weight:bold;font-size:13pt;margin:0 0 10px;letter-spacing:.3px}
+  #reportPrint .rp-company{font-weight:bold;font-size:12.5pt;padding-bottom:6px;border-bottom:2px solid #1f2a55;margin:0 0 8px}
+  #reportPrint .rp-idblock{margin:8px 0;padding-left:18%}
+  #reportPrint .rp-idblock .rp-cal{margin-top:2px}
+  #reportPrint .rp-idblock .rp-cal b{margin-right:8px}
+  #reportPrint hr{border:none;border-top:1px solid #000;margin:8px 0}
+  #reportPrint table.rp-head{width:100%;border-collapse:collapse;margin:6px 0}
+  #reportPrint table.rp-head td{padding:1px 6px;vertical-align:top;font-size:10.5pt}
+  #reportPrint table.rp-head td.lbl{text-align:right;font-weight:bold;width:17%;white-space:nowrap}
+  #reportPrint table.rp-head td.val{width:33%}
+  #reportPrint .rp-box{border:1px solid #000;padding:8px 10px;margin:10px 0}
+  #reportPrint .rp-box .rp-boxtitle{text-align:center;font-weight:bold;margin:0 0 6px;font-size:11pt}
+  #reportPrint .rp-boxhd{font-weight:bold;text-decoration:underline;margin:0 0 6px;font-size:10.5pt}
+  #reportPrint table.rp-spec{width:100%;border-collapse:collapse;margin:0 0 6px}
+  #reportPrint table.rp-spec td{padding:1px 6px;font-size:10.5pt;vertical-align:top}
+  #reportPrint table.rp-spec td.lbl{text-align:right;font-weight:bold;white-space:nowrap}
+  #reportPrint table.rp-data{width:100%;border-collapse:collapse;font-size:10pt}
+  #reportPrint table.rp-data th{text-align:left;border-bottom:1px solid #000;padding:2px 6px;font-size:9.5pt;vertical-align:bottom}
+  #reportPrint table.rp-data td{padding:1px 6px;vertical-align:top}
+  #reportPrint .rp-notes{margin:10px 0}
+  #reportPrint .rp-notes .rp-nhd{font-weight:bold;text-decoration:underline;margin-bottom:3px}
+  #reportPrint .rp-foot td{padding:1px 6px;font-size:10.5pt;vertical-align:top}
+  #reportPrint .rp-foot td.lbl{text-align:right;font-weight:bold;white-space:nowrap;width:22%}
 </style>
 </head>
 <body>
@@ -141,6 +202,12 @@
   <p>Adjunta un Excel o pega la tabla (OT + denominación de objeto técnico). El sistema identifica el TAG de cada orden, lo asocia a su procedimiento P-SG y genera una plantilla de notificación <strong>.txt</strong> por cada OT, editable y descargable.</p>
 </header>
 
+<div class="tabs" role="tablist">
+  <button class="tab active" id="tabNoti" data-tab="noti" role="tab">Notificaciones</button>
+  <button class="tab" id="tabReporte" data-tab="reporte" role="tab">Reporte de calibración</button>
+</div>
+
+<div id="panel-noti" class="tabpanel active">
 <div class="toprow">
   <section class="card">
     <div class="sectionhd"><span class="num">01</span><h2>Cargar datos</h2></div>
@@ -194,7 +261,28 @@
   </div>
   <div id="rows"></div>
 </section>
+</div><!-- /panel-noti -->
+
+<div id="panel-reporte" class="tabpanel">
+  <section class="card">
+    <div class="sectionhd"><span class="num">R</span><h2>Generador de reporte de calibración</h2></div>
+    <p class="hint" style="margin-top:0">Digita el TAG de un instrumento y pulsa <b>Buscar</b>. Se cargan de la base sus datos (fabricante, serie, rango, precisión, patrones utilizados, etc.). Solo ingresas los <b>valores de calibración</b> (Enc. como / Dejado como): la salida nominal, el % de desviación y el resultado Aprobado/Fallado se calculan solos. Luego <b>Generar reporte</b> imprime un PDF con el mismo formato del informe de DPCTrack.</p>
+    <div class="grid2" style="margin-top:14px">
+      <div><label class="fld">TAG del instrumento</label><input type="text" id="repTag" placeholder="p. ej. PT-U7122" autocomplete="off"></div>
+      <div style="align-self:end;display:flex;gap:8px">
+        <button id="repBuscar" class="btn primary" style="margin-top:0">Buscar</button>
+        <button id="repLimpiar" class="btn ghost" style="margin-top:0">Limpiar</button>
+      </div>
+    </div>
+    <div id="repMsg" class="hint" style="margin-top:12px"></div>
+    <div id="repForm" style="display:none;margin-top:8px"></div>
+    <div id="repActions" style="display:none;margin-top:18px;padding-top:16px;border-top:1px solid var(--line);justify-content:flex-end;gap:8px">
+      <button id="repGenerar" class="btn primary" style="margin-top:0">Generar reporte (PDF)</button>
+    </div>
+  </section>
+</div><!-- /panel-reporte -->
 
 <footer>Funciona 100% en tu navegador · Ningún dato se envía a servidores · <span title="Fecha de compilación. Si no coincide con la última, recarga con Ctrl+Shift+R.">versión <!--BUILD--></span></footer>
 </div>
+<div id="reportPrint" aria-hidden="true"></div>
 <script>
