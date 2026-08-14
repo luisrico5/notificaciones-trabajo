@@ -5,5 +5,7 @@ set -e
 DIR="$(cd "$(dirname "$0")" && pwd)"
 cat "$DIR/src/part_head.html" "$DIR/src/xlsx.full.min.js" > "$DIR/index.html"
 printf '\n' >> "$DIR/index.html"
+cat "$DIR/src/html2pdf.bundle.min.js" >> "$DIR/index.html"
+printf '\n' >> "$DIR/index.html"
 cat "$DIR/src/part_tail.html" >> "$DIR/index.html"
 echo "index.html generado ($(wc -c < "$DIR/index.html") bytes)"

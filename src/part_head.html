@@ -165,31 +165,43 @@
   @media print{
     .wrap{display:none !important}
     #reportPrint{display:block !important}
-    @page{size:letter;margin:14mm}
+    @page{size:letter;margin:11mm}
   }
-  #reportPrint{font-family:'Times New Roman',Georgia,serif;color:#000;font-size:11pt;line-height:1.32;
-    background:#fff;padding:8mm;max-width:190mm;margin:0 auto}
-  #reportPrint .rp-title{text-align:center;font-weight:bold;font-size:13pt;margin:0 0 10px;letter-spacing:.3px}
-  #reportPrint .rp-company{font-weight:bold;font-size:12.5pt;padding-bottom:6px;border-bottom:2px solid #1f2a55;margin:0 0 8px}
-  #reportPrint .rp-idblock{margin:8px 0;padding-left:18%}
-  #reportPrint .rp-idblock .rp-cal{margin-top:2px}
-  #reportPrint .rp-idblock .rp-cal b{margin-right:8px}
-  #reportPrint hr{border:none;border-top:1px solid #000;margin:8px 0}
-  #reportPrint table.rp-head{width:100%;border-collapse:collapse;margin:6px 0}
+  /* Modo "descargar todos": cada reporte del lote empieza en su propia página. */
+  #reportPrint .rp-doc{page-break-after:always;break-after:page}
+  #reportPrint .rp-doc:last-child{page-break-after:auto;break-after:auto}
+  #reportPrint{font-family:'Times New Roman',Georgia,serif;color:#000;font-size:11pt;line-height:1.26;
+    background:#fff;padding:4mm;max-width:190mm;margin:0 auto}
+  #reportPrint .rp-title{text-align:center;font-weight:bold;font-size:13pt;margin:6px 0 10px;letter-spacing:.3px}
+  #reportPrint .rp-company{font-weight:bold;font-size:12.5pt;padding-bottom:5px;border-bottom:2.5px solid #000080;margin:0 0 6px}
+  #reportPrint hr{border:none;border-top:1px solid #000;margin:6px 0}
+  #reportPrint table.rp-head{width:100%;border-collapse:collapse;margin:5px 0}
+  /* Línea (hr) bajo el bloque del TAG dentro de la tabla combinada, y aire con la cabecera. */
+  #reportPrint table.rp-head tr.rp-idlast td{border-bottom:1px solid #000;padding-bottom:6px}
+  #reportPrint table.rp-head tr.rp-hd1 td{padding-top:6px}
   #reportPrint table.rp-head td{padding:1px 6px;vertical-align:top;font-size:10.5pt}
   #reportPrint table.rp-head td.lbl{text-align:right;font-weight:bold;width:17%;white-space:nowrap}
   #reportPrint table.rp-head td.val{width:33%}
-  #reportPrint .rp-box{border:1px solid #000;padding:8px 10px;margin:10px 0}
-  #reportPrint .rp-box .rp-boxtitle{text-align:center;font-weight:bold;margin:0 0 6px;font-size:11pt}
-  #reportPrint .rp-boxhd{font-weight:bold;text-decoration:underline;margin:0 0 6px;font-size:10.5pt}
-  #reportPrint table.rp-spec{width:100%;border-collapse:collapse;margin:0 0 6px}
+  #reportPrint .rp-box{border:1px solid #000080;padding:7px 10px;margin:8px 0;page-break-inside:avoid}
+  #reportPrint .rp-box .rp-boxtitle{text-align:center;font-weight:bold;margin:0 0 5px;font-size:11pt}
+  #reportPrint .rp-boxhd{font-weight:bold;text-decoration:underline;margin:0 0 5px;font-size:10.5pt}
+  #reportPrint table.rp-spec{width:100%;border-collapse:collapse;margin:0 0 5px}
   #reportPrint table.rp-spec td{padding:1px 6px;font-size:10.5pt;vertical-align:top}
   #reportPrint table.rp-spec td.lbl{text-align:right;font-weight:bold;white-space:nowrap}
   #reportPrint table.rp-data{width:100%;border-collapse:collapse;font-size:10pt}
-  #reportPrint table.rp-data th{text-align:left;border-bottom:1px solid #000;padding:2px 6px;font-size:9.5pt;vertical-align:bottom}
+  #reportPrint table.rp-data th{text-align:left;text-decoration:underline;padding:2px 6px 3px;font-size:9.5pt;vertical-align:bottom}
+  /* Tabla de puntos (Especificaciones): del 2º título en adelante en una sola línea; el 1º (largo) sí envuelve. */
+  #reportPrint table.rp-pts th{white-space:nowrap}
+  #reportPrint table.rp-pts th:first-child{white-space:normal}
+  /* Tabla de patrones (Instrumentos de prueba): todos los títulos en una sola línea (se reduce fuente/padding para que quepan). */
+  #reportPrint table.rp-std th{white-space:nowrap;font-size:8pt;padding:2px 5px 3px}
+  #reportPrint table.rp-std td{font-size:9pt;padding:1px 5px}
   #reportPrint table.rp-data td{padding:1px 6px;vertical-align:top}
-  #reportPrint .rp-notes{margin:10px 0}
+  #reportPrint table.rp-data tr{page-break-inside:avoid}
+  /* Si la nota no cabe entera en lo que queda de la página 1, NO se parte: salta completa a la 2. */
+  #reportPrint .rp-notes{margin:8px 0;page-break-inside:avoid;break-inside:avoid}
   #reportPrint .rp-notes .rp-nhd{font-weight:bold;text-decoration:underline;margin-bottom:3px}
+  #reportPrint .rp-notetext{white-space:pre-wrap;word-break:break-word;font-size:10.5pt}
   #reportPrint .rp-foot td{padding:1px 6px;font-size:10.5pt;vertical-align:top}
   #reportPrint .rp-foot td.lbl{text-align:right;font-weight:bold;white-space:nowrap;width:22%}
 </style>
@@ -266,18 +278,25 @@
 <div id="panel-reporte" class="tabpanel">
   <section class="card">
     <div class="sectionhd"><span class="num">R</span><h2>Generador de reporte de calibración</h2></div>
-    <p class="hint" style="margin-top:0">Digita el TAG de un instrumento y pulsa <b>Buscar</b>. Se cargan de la base sus datos (fabricante, serie, rango, precisión, patrones utilizados, etc.). Solo ingresas los <b>valores de calibración</b> (Enc. como / Dejado como): la salida nominal, el % de desviación y el resultado Aprobado/Fallado se calculan solos. Luego <b>Generar reporte</b> imprime un PDF con el mismo formato del informe de DPCTrack.</p>
-    <div class="grid2" style="margin-top:14px">
-      <div><label class="fld">TAG del instrumento</label><input type="text" id="repTag" placeholder="p. ej. PT-U7122" autocomplete="off"></div>
+    <p class="hint" style="margin-top:0">Al <b>procesar el pegado o el Excel</b> en la pestaña <b>Notificaciones</b>, se generan automáticamente los reportes de calibración de los instrumentos que estén en la base (los que no estén, se omiten). Elige un instrumento en la lista para revisar y editar su reporte. También puedes buscar un TAG suelto. Solo ingresas los <b>valores de calibración</b> (Enc./Dejado); lo demás se autollena. <b>Generar reporte</b> imprime el PDF; <b>Grabar a la base de datos</b> descarga un solo JSON con TODOS los instrumentos para actualizar la base.</p>
+    <div class="selectbar">
+      <label for="repSelect">Instrumentos cargados (reportes)</label>
+      <select id="repSelect"><option value="">— Ninguno cargado (procesa datos en Notificaciones o busca un TAG) —</option></select>
+    </div>
+    <div class="grid2" style="margin-top:6px">
+      <div><label class="fld">Buscar/agregar un TAG suelto</label><input type="text" id="repTag" placeholder="p. ej. PT-U7122" autocomplete="off"></div>
       <div style="align-self:end;display:flex;gap:8px">
-        <button id="repBuscar" class="btn primary" style="margin-top:0">Buscar</button>
-        <button id="repLimpiar" class="btn ghost" style="margin-top:0">Limpiar</button>
+        <button id="repBuscar" class="btn" style="margin-top:0">Buscar / agregar</button>
+        <button id="repLimpiar" class="btn ghost" style="margin-top:0">Vaciar reportes</button>
       </div>
     </div>
     <div id="repMsg" class="hint" style="margin-top:12px"></div>
     <div id="repForm" style="display:none;margin-top:8px"></div>
     <div id="repActions" style="display:none;margin-top:18px;padding-top:16px;border-top:1px solid var(--line);justify-content:flex-end;gap:8px">
-      <button id="repGenerar" class="btn primary" style="margin-top:0">Generar reporte (PDF)</button>
+      <button id="repGrabar" class="btn" style="margin-top:0">Grabar a la base de datos</button>
+      <button id="repGenerar" class="btn ghost" style="margin-top:0">Generar reporte (PDF)</button>
+      <button id="repDescargar" class="btn" style="margin-top:0">Descargar reporte (PDF)</button>
+      <button id="repDescargarTodos" class="btn primary" style="margin-top:0">Descargar todos (PDF)</button>
     </div>
   </section>
 </div><!-- /panel-reporte -->

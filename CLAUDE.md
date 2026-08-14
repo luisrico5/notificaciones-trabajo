@@ -22,22 +22,34 @@ src/
   part_head.html      <- <head> + CSS + markup + apertura de <script> de la librería.
   part_tail.html      <- cierre de librería + TODA la lógica JS de la app (aquí se edita casi todo).
   xlsx.full.min.js    <- SheetJS incrustado (lectura de Excel). No modificar.
+  html2pdf.bundle.min.js <- html2pdf (html2canvas + jsPDF) incrustado, para descargar reportes en PDF sin diálogo. No modificar.
   build_config.py     <- Genera el mapeo TAG→procedimiento desde src/answers/ y lo inyecta en part_tail.html.
   default_map.js      <- Salida intermedia de build_config.py (referencia).
   answers/proc_*.txt  <- Resúmenes de cada procedimiento extraídos de NotebookLM (fuente del mapeo).
   extract_ranges.ps1  <- Lee el .mdb de calibración y vuelca por TAG {rango,salida,patrones,técnico,
                          indicación} (TAG_RANGES) y el informe completo (TAG_REPORT: cabecera,
                          especificaciones por grupo con puntos/límites y patrones con detalle) en
-                         part_tail.html; genera además datos_calibracion.json ({tags, reportes}).
+                         part_tail.html (+ TEST_INSTR, catálogo de patrones); genera además
+                         datos_calibracion.json ({tags, reportes, patrones}).
+  grabar_reporte.ps1  <- Inserta en la base EDITABLE la calibración generada por el dashboard (del JSON del
+                         botón "Grabar a la base de datos"), copiando la última calib. como plantilla para
+                         que DPCTrack la lea igual. Nunca toca la contraseña ni la base _backup.
 datos_calibracion.json <- Datos de calibración portables (para adjuntar en la app). Generado.
 .gitignore            <- Excluye *.mdb y zzz/ (no publicar base ni binarios).
-20260810_dpctrack2_backup.mdb  <- Base DPCTrack2 (Jet 4, con contraseña; está en zzz\PasswordReset.exe). Fuente de datos. NO PUBLICAR.
+20260810_dpctrack2_backup.mdb    <- Base DPCTrack2 (Jet 4, clave en zzz\PasswordReset.exe). SOLO CONSULTA (ver regla). NO PUBLICAR.
+20260810_dpctrack2_editable.mdb  <- Copia de trabajo de la base (aquí SÍ se puede modificar). NO PUBLICAR.
 zzz/                  <- Carpeta del programa DPCTrack2 (binarios). NO PUBLICAR; útil solo de referencia.
 ```
+> **⛔ REGLA ESTRICTA — base de datos de SOLO CONSULTA:** `20260810_dpctrack2_backup.mdb` es **de solo
+> lectura**. **NUNCA** se debe escribir, modificar, actualizar ni ejecutar sobre ella nada que altere sus
+> datos (ni INSERT/UPDATE/DELETE por OLEDB, ni desde DPCTrack, ni de ninguna forma). Solo se abre para
+> **leer/consultar** (extraer rangos, patrones, cabeceras, etc.). Para cualquier cambio a la base se usa la
+> **copia de trabajo** `20260810_dpctrack2_editable.mdb`. Si en el futuro se necesita escribir en una base,
+> se hace siempre sobre la copia editable, nunca sobre la `_backup`.
 > **Etapa 3 (GitHub Pages):** publicar SOLO `index.html` (y opcionalmente `src/`). **Nunca subir** el
 > `.mdb`, la carpeta `zzz/` ni la contraseña de la base — añádelos a `.gitignore`. Los rangos ya quedan
 > incrustados en `index.html`, así que el sitio no necesita la base.
-`index.html` = `part_head.html` + `xlsx.full.min.js` + `"\n"` + `part_tail.html`.
+`index.html` = `part_head.html` + `xlsx.full.min.js` + `"\n"` + `html2pdf.bundle.min.js` + `"\n"` + `part_tail.html`.
 
 ## Construir
 ```
@@ -128,7 +140,43 @@ está en medio y el archivo se regenera).
   (imprimir a PDF). El CSS de `#reportPrint` (en `part_head.html`) está oculto en pantalla y visible en
   `@media print`; usa serif Times, cabecera de dos columnas, cajas con borde y la regla azul de la empresa,
   igual que el PDF original. `TAG_REPORT` se genera en el MISMO paso de `extract_ranges.ps1` (misma base) e
-  igual se incrusta y se incluye en `datos_calibracion.json` (`{tags, reportes}`, ahora `version:2`).
+  igual se incrusta y se incluye en `datos_calibracion.json` (`{tags, reportes, patrones}`, ahora `version:2`).
+  **Selector "agregar patrón"**: además de los patrones por defecto (los del último reporte), el formulario
+  tiene un desplegable con el catálogo completo de patrones (`TEST_INSTR`, tabla `TESTINST`: code →
+  `[name,mf,model,serial,lastCal,nextCal]`) para **añadir más**; se guardan en `repState.extraStd` (no
+  mutan el registro base), se listan con opción de quitar, se deduplican por código y `repStdBox` concatena
+  por-defecto + añadidos. Fuente: `testInstrSrc()` (override `CAL_OVERRIDE.patrones` o `TEST_INSTR`
+  incrustado). `TEST_INSTR` se genera en el mismo `extract_ranges.ps1`.
+  **Generación por lote** (`REP_BATCH`/`buildRepBatch`/`renderRepSelect`/`repSelectShow`): al **procesar el
+  pegado o el Excel** en Notificaciones, además de las plantillas `.txt`, se generan los reportes de
+  calibración de cada orden cuyo TAG esté en la base (`repLookup`); los que no estén se **omiten**. La
+  pestaña de reporte tiene un **desplegable** (`#repSelect`) para elegir y **revisar/editar** cada uno
+  (cada entrada del lote es un estado editable independiente; las ediciones se conservan al cambiar de
+  instrumento). "Buscar/agregar un TAG suelto" agrega uno más al lote. "Vaciar reportes" limpia el lote.
+  **Botones de PDF** (todos usan el mismo `repBuildHtml`→`#reportPrint`, salen idénticos):
+  (1) **"Generar reporte (PDF)"** (`repGenerar`) → abre la ventana de impresión del navegador (Guardar como
+  PDF, **vectorial**). (2) **"Descargar reporte (PDF)"** (`repDescargar`→`repPdfFrom`) → **descarga directa**
+  (sin diálogo) del instrumento seleccionado con **html2pdf** (rasteriza `#reportPrint` con html2canvas y baja
+  el `.pdf`). (3) **"Descargar todos (PDF)"** (`repDescargarTodos`) → **UN PDF POR INSTRUMENTO**, descarga
+  directa y secuencial (encadena promesas `repPdfFrom` por cada `REP_BATCH`, nombre `<tag>.pdf`).
+  `repPdfFrom` pone `#reportPrint` visible fuera de pantalla, corre `html2pdf().from(box).save()` y restaura.
+  **Botón "Grabar a la base de datos"** (`repGrabar`/`repGrabarPayload` + `src/grabar_reporte.ps1`): descarga
+  **UN SOLO JSON con TODOS los instrumentos del lote** (`{version,generado,calibraciones:[…]}`) y lo graba en
+  la base DPCTrack2 **editable** para que DPCTrack los lea y produzca los reportes idénticos. Como el navegador **no puede** escribir el `.mdb` (Access cifrado, sin servidor), el botón
+  **descarga un JSON** (`grabar_<tag>_<fecha>.json`) con todos los datos (cabecera, grupos con puntos y
+  lecturas Enc./Dejado, patrones, nota) y el usuario lo pasa a `src/grabar_reporte.ps1`, que **inserta** la
+  calibración en `20260810_dpctrack2_editable.mdb`. El script **copia la última calibración del mismo
+  instrumento como plantilla** (todas las columnas de `CALIBRAT`/`CalGroups`/`CALDET`) y solo sobrescribe lo
+  nuevo (IDs `MAX+1` — no hay autonumber —, fecha, técnico, temp/humedad, certificado, tipo, `Reading` de
+  cada punto = valor Enc./Dejado, `RESULTSTATUS` por límites, `Failed`/`AsFound`), reconstruye `CALTEST`
+  desde los patrones del reporte y crea `PCNotes` (`NoteID` `MAX+1`). Acepta **uno o varios** instrumentos
+  (`$d.calibraciones`): itera con IDs incrementales, todo en **una transacción** (atómico; `Q` lleva la
+  transacción en cada SELECT); omite (con aviso) los que no tengan calibración previa de plantilla. Fija el
+  `OleDbType` de cada parámetro desde el esquema (evita "type mismatch" con los NULL). La **contraseña de la
+  base NO se toca** (se abre con ella y queda igual). Uso:
+  `powershell -File src\grabar_reporte.ps1 -Json <archivo> -Password "<clave>"`. Verificado contra la base
+  (estudiado en 5 instrumentos; probado grabando 3 en lote — LT/PT/WT — que quedaron como la calib. más
+  reciente de cada uno con la estructura exacta).
 - `ajustaWT(k,denom)`: **WT** comparte prefijo entre peso y torque. Si el nombre contiene "torque" se
   enruta a `WT-TORQUE` (entrada con 3 opciones por centrífuga: `P-SG-04618` CE-6H, `P-SG-04619`
   CE-8H/9H·F-3424/F-3425, `P-SG-04620` CE-1H…7H·F-3423); si no, se queda en peso (`WT` → `P-SG-04533`).

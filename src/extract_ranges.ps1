@@ -227,6 +227,8 @@ foreach ($code in ($inst.Keys | Sort-Object)) {
   if ($latest.ContainsKey($code)) {
     $L = $latest[$code]
     $rec['ct'] = $L.ctype; $rec['tp'] = $L.temp; $rec['hu'] = $L.hum; $rec['ce'] = $L.cert; $rec['by'] = $L.by
+    # Nota del reporte más reciente (texto completo; en WT trae la tabla de celdas de carga, muy larga).
+    $rec['nt'] = if ($null -ne $L.note -and $notes.ContainsKey($L.note)) { ([string]$notes[$L.note]).Trim() } else { '' }
     $cid = $L.cid
     if ($byCidFull.ContainsKey($cid)) {
       $seen = @{}; $lst = @()
@@ -234,11 +236,24 @@ foreach ($code in ($inst.Keys | Sort-Object)) {
       $rec['std'] = @($lst)
     } else { $rec['std'] = @() }
   } else {
-    $rec['ct'] = ''; $rec['tp'] = ''; $rec['hu'] = ''; $rec['ce'] = ''; $rec['by'] = ''; $rec['std'] = @()
+    $rec['ct'] = ''; $rec['tp'] = ''; $rec['hu'] = ''; $rec['ce'] = ''; $rec['by'] = ''; $rec['nt'] = ''; $rec['std'] = @()
   }
   $rep[$k] = $rec
 }
 Write-Host ("Instrumentos con informe (TAG_REPORT): " + $rep.Count)
+
+# --- Catálogo de patrones (TESTINST) para el selector "Agregar patrón" del reporte ---
+$conn4 = New-Conn
+$ti = [ordered]@{}
+foreach ($r in (Q $conn4 ("SELECT TESTINSTRUMENTCODE, TESTINSTRUMENTNAME, MANUFACTURER, MODELNUMBER, " +
+    "SERIALNUMBER, LastCalibrationDate, NextCalibrationDate FROM TESTINST")).Rows) {
+  $code = Str $r['TESTINSTRUMENTCODE']; if ($code -eq '') { continue }
+  $ti[$code] = @((Str $r['TESTINSTRUMENTNAME']), (Str $r['MANUFACTURER']), (Str $r['MODELNUMBER']),
+    (Str $r['SERIALNUMBER']), (DateDMY $r['LastCalibrationDate']), (DateDMY $r['NextCalibrationDate']))
+}
+$conn4.Close()
+$tiJson = ($ti | ConvertTo-Json -Depth 4 -Compress)
+Write-Host ("Patrones en catálogo (TEST_INSTR): " + $ti.Count)
 
 # --- Serializar TAG_RANGES (JSON compacto manual) ---
 function Esc($s) { ([string]$s) -replace '\\', '\\' -replace '"', '\"' }
@@ -263,12 +278,16 @@ $bloqueRep = "var TAG_REPORT=" + $repJson + ";"
 $reRep = '(?s)(/\* TAG_REPORT:INICIO \*/).*?(/\* TAG_REPORT:FIN \*/)'
 if ($tail -notmatch $reRep) { throw "No encontre los marcadores TAG_REPORT en part_tail.html" }
 $tail = [regex]::Replace($tail, $reRep, { param($m) $m.Groups[1].Value + "`r`n" + $bloqueRep + "`r`n" + $m.Groups[2].Value })
+$bloqueTi = "var TEST_INSTR=" + $tiJson + ";"
+$reTi = '(?s)(/\* TEST_INSTR:INICIO \*/).*?(/\* TEST_INSTR:FIN \*/)'
+if ($tail -notmatch $reTi) { throw "No encontre los marcadores TEST_INSTR en part_tail.html" }
+$tail = [regex]::Replace($tail, $reTi, { param($m) $m.Groups[1].Value + "`r`n" + $bloqueTi + "`r`n" + $m.Groups[2].Value })
 Set-Content -Path $tailPath -Value $tail -Encoding UTF8 -NoNewline
 
 # 2) Escribir el archivo portable que el dashboard puede adjuntar a futuro para actualizar su escaneo.
 $jsonPath = Join-Path (Split-Path -Parent $tailPath) "..\datos_calibracion.json"
 $hoy = (Get-Date).ToString("yyyy-MM-dd")
-$json = '{"version":2,"generado":"' + $hoy + '","tags":{' + "`r`n" + $cuerpo + "`r`n},"+'"reportes":' + $repJson + '}'
+$json = '{"version":2,"generado":"' + $hoy + '","tags":{' + "`r`n" + $cuerpo + "`r`n},"+'"reportes":' + $repJson + ',"patrones":' + $tiJson + '}'
 Set-Content -Path $jsonPath -Value $json -Encoding UTF8 -NoNewline
 Write-Host ("Generado: " + (Resolve-Path $jsonPath).Path)
 Write-Host "part_tail.html actualizado. Ahora: powershell -ExecutionPolicy Bypass -File build.ps1"
