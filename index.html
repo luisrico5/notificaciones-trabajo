@@ -283,6 +283,10 @@
       <label for="repSelect">Instrumentos cargados (reportes)</label>
       <select id="repSelect"><option value="">— Ninguno cargado (procesa datos en Notificaciones o busca un TAG) —</option></select>
     </div>
+    <div class="selectbar">
+      <label for="repTecnico">Quién realizó la calibración (aplica a todos)</label>
+      <select id="repTecnico"><option value="">— Selecciona técnico (aplica a todos) —</option></select>
+    </div>
     <div class="grid2" style="margin-top:6px">
       <div><label class="fld">Buscar/agregar un TAG suelto</label><input type="text" id="repTag" placeholder="p. ej. PT-U7122" autocomplete="off"></div>
       <div style="align-self:end;display:flex;gap:8px">
@@ -301,7 +305,7 @@
   </section>
 </div><!-- /panel-reporte -->
 
-<footer>Funciona 100% en tu navegador · Ningún dato se envía a servidores · <span title="Fecha de compilación. Si no coincide con la última, recarga con Ctrl+Shift+R.">versión 2026-08-13 21:40</span></footer>
+<footer>Funciona 100% en tu navegador · Ningún dato se envía a servidores · <span title="Fecha de compilación. Si no coincide con la última, recarga con Ctrl+Shift+R.">versión 2026-08-14 21:30</span></footer>
 </div>
 <div id="reportPrint" aria-hidden="true"></div>
 <script>
@@ -2509,6 +2513,11 @@ var TAG_REPORT={"FITCT10":{"tag":"FIT-CT10","n":"VAPOR A LINEA-2","co":"Mexichem
 /* TEST_INSTR:INICIO */
 var TEST_INSTR={"U-7167":["BLOQUE SECO DE -30 A 155°C.","Hart Scientific","9171","A83328","20/11/2023","30/11/2024"],"U-7168":["BLOQUE SECO DE 50 A 700°C.","Hart Scientific","9171","A83358","27/11/2025","30/11/2026"],"U--7166":["BLOQUE SECO DE -30 A 155°C.","Hart Scientific","9171","A83328","20/11/2023","30/11/2024"],"U-7169":["PESA PATRON DE 1000 GR","Troemner","","N/A","5/8/2025","5/8/2029"],"U-7172":["PESA PATRON DE 20 KGR","Servipesa","","N/A","5/8/2025","5/8/2029"],"U7174":["PESA PATRON DE 10 KGR","Servipesa","","N/A","17/10/2020","17/10/2024"],"U-7176":["PESA PATRON DE 500 GR","Mettler Toledo","500G OIML R111 F1","339600","5/8/2025","5/8/2029"],"U-7177":["KIT DESDE 200 mgr HASTA 100 gr","","200 g OIML R111 F1","72655","5/8/2025","5/8/2029"],"U-6549":["TRIPLE OUTPUT DC POWER SUPPLY","AGILENT","E3631A","MY40015449","13/10/2020","13/10/2024"],"U-6494":["TESTER FLUKE BLANCO","Fluke","45","6778030","11/9/2024","11/9/2028"],"U-6526":["MULTIMETRO DIGITAL 6 1/2 DIGITOS.","Fluke","8846A","1490017","22/1/2025","22/1/2029"],"U-7187":["CALIBRADOR DE PROCESOS FLUKE 754","Fluke","754","44450027","6/9/2024","30/9/2026"],"U-6905":["TESTER FLUKE EX","Fluke","28 II EX","42550020","1/3/2023","31/8/2023"],"U-6908":["TESTER FLUKE EX","Fluke","28 II EX","42540055","10/3/2023","31/8/2023"],"U-6910":["TESTER FLUKE EX","Fluke","28 II EX","41440013","21/2/2023","31/8/2023"],"U-7037":["TESTER FLUKE EX","Fluke","28 II EX","42540053","10/3/2023","31/8/2023"],"U-7054":["TESTER FLUKE EX","Fluke","28 II EX","42600012","21/2/2023","31/8/2023"],"8846A":["MULTIMETRO DIGITAL CON RESOLUCION DE 6 1/2 DIGITOS","Fluke","8846A","1490017","15/10/2020","15/10/2024"],"U-6556":["FLUKE 179","Fluke","179","14490575","21/2/2023","31/8/2023"],"U-6555":["FLUKE 179","Fluke","179","23640558","1/3/2016","31/3/2017"],"U-6557":["FLUKE 179","Fluke","179","25980187","18/8/2021","31/8/2022"],"U-6560":["FLUKE 179","Fluke","179","23640556","2/6/2023","31/8/2023"],"U-6907":["FLUKE 179","Fluke","179","","21/2/2023","31/8/2023"],"U-6909":["FLUKE 179","Fluke","179","26290248","21/2/2023","31/8/2023"],"U-7170":["BLOQUE SECO","Fluke","9171","C57223","20/7/2025","31/7/2027"],"U-7189":["CALIBRADOR DE PROCESOS FLUKE 725","Fluke","725","1398128","17/10/2024","17/10/2028"],"U-7190":["CALIBRADOR DE PROCESOS FLUKE 724","Fluke","724","9617175","9/9/2024","9/9/2028"],"U-7192":["MODULO DE PRESION DE 100 PSIA","Fluke","700PA06","96306603","23/11/2024","23/11/2028"],"U-7197":["Modulo de presion de 10000 psig","Fluke","700P31","96153103","13/10/2020","13/10/2024"],"U-7198":["Modulo de presion  0 a 300 psig","Fluke","700P27","96202714","13/12/2019","13/12/2023"],"U-7199":["Modulo de presion  0 a 100 psiA","Fluke","750PA6","3843028","23/11/2024","23/11/2028"],"U-7057":["TESTER FLUKE EX","Fluke","28 II EX","42540051","22/8/2021","31/8/2022"],"U-7068":["TESTER FLUKE EX","Fluke","28 II EX","42540054","16/5/2023","31/8/2023"],"U-7051":["TESTER FLUKE EX","Fluke","28 II EX","42550031","10/3/2023","30/9/2023"],"U-6496":["FLUKE 179","Fluke","179","26200138","30/3/2022","30/9/2022"],"U-6553":["FLUKE 179","Fluke","179","14950112","10/3/2023","31/8/2023"],"U-6554":["FLUKE 179","Fluke","179","87820204","26/9/2019","30/9/2020"],"U-6911":["FLUKE 179","Fluke","179","26290249","","31/8/2022"],"U-7036":["FLUKE 179","Fluke","179","28140501","31/3/2022","31/3/2023"],"U-7038":["FLUKE 179","Fluke","179","26200170","1/3/2023","31/8/2023"],"U-7052":["FLUKE 179","Fluke","179","15200616","31/8/2021","31/8/2022"],"U-7053":["FLUKE 179","Fluke","179","26200164","18/8/2021","31/8/2022"],"U-7055":["FLUKE 179","Fluke","179","14950166","31/3/2022","28/2/2023"],"U-7201":["Modulo de presion de 0 a 300 PSIA","Fluke","750PA27","2892138","3/12/2021","3/12/2025"],"U-7207":["FLUKE 707EX CALIBRADOR DE LAZO","Fluke","707","4290576","6/9/2024","30/9/2026"],"U-7208":["FLUKE 707 CALIBRADOR DE LAZO","Fluke","707","1289095","5/5/2024","31/5/2026"],"U-6527":["FLUKE 707 CALIBRADOR DE LAZO","Fluke","707","9625076","6/9/2024","30/9/2026"],"U-7148":["TERMOMETRO DE VIDRIO","Weksler","ASTM69C","2339","15/10/2021","15/10/2025"],"U-7161":["TERMOMETRO DE VIDRIO","Weksler","ASTM 64F","IE1718","12/10/2021","12/10/2025"],"U-7056":["FLUKE 179","Fluke","179","39380492","21/2/2023","31/8/2023"],"LIT-R636":["","","","","",""],"TE-2411":["","","","","",""],"U-7070":["FLUKE 179","Fluke","179","39380490","9/3/2023","31/3/2024"],"U-6544":["FLUKE 179","Fluke","179","","15/5/2023","31/5/2024"],"U-7166":["BLOQUE SECO -30°C A 155°C","Fluke","9171","A83328","27/11/2025","30/11/2026"],"U-7202":["MODULO DE PRESIÓN DE 0 - 300 PSIG","Fluke","","3000436442","15/6/2025","15/6/2029"],"U-7158":["TERMOMETRO DE VIDRIO","Weksler","ASTM 66F","2557","13/10/2021","13/10/2025"],"U-7164":["TERMOMETRO DE VIDRIO","Weksler","ASTM 66F","92872","6/9/2019","6/9/2023"],"U-7160":["TERMOMETRO DE VIDRIO","Weksler","ASTM 63F","IN8759","12/10/2021","12/10/2025"],"U-7159":["TERMOMETRO DE VIDRIO","Weksler","ASTM 62F","IJ2273","12/10/2021","12/10/2025"],"U-7165":["TERMOMETRO DE VIDRIO","Weksler","ASTM 67F","IJ3883","13/10/2021","13/10/2025"],"U-7188":["CALIBRADOR DE PROCESOS FLUKE 726","Fluke","726","1531172","2/5/2024","31/5/2026"],"U-6546":["CALIBRADOR DE PROCESOS FLUKE 725EX","Fluke","725EX","4457245","10/9/2024","30/9/2026"],"U-7191":["Modulo de presion de 0 a 300 psia","Fluke","750PA27","4421397","20/11/2024","20/11/2028"],"U-7193":["Modulo de presion de 15 psia","Fluke","750PA4EX","4225071","23/10/2021","23/10/2025"],"U-7194":["Modulo de presion de 15 PSID/G","Fluke","750P24EX","4362012","10/2/2025","10/2/2029"],"U-7195":["Modulo de presion de 3000 psig","Fluke","750P29EX","4358142","20/11/2024","20/11/2028"],"U-7196":["Modulo de presion de 1500 psig","Fluke","750P09EX","4341079","26/9/2025","26/9/2029"],"U-7200":["Modulo de presion  0 a 300 psig","Fluke","700P27EX","4061235","26/4/2024","26/4/2028"],"U-7206":["FLUKE 707EX CALIBRADOR DE LAZO","Fluke","707EX","4290574","6/9/2024","30/9/2026"],"U-7209":["FLUKE 707EX CALIBRADOR DE LAZO","Fluke","707EX","4290577","5/5/2024","31/5/2026"],"U-6873":["MODULO DE PRESION DE 0-100 PSIA","Fluke","700PA06EX","4295368","10/2/2025","28/2/2027"],"U-6508":["TESTER FLUKE EX","Fluke","28 II EX","42340009","21/2/2023","31/8/2023"],"U-6552":["TESTER FLUKE EX","Fluke","28 II EX","42550046","21/2/2023","31/8/2023"]};
 /* TEST_INSTR:FIN */
+/* TECNICOS: lista de quienes realizan la calibración (WHOCALIBRATED de la base), por frecuencia.
+   Alimenta el desplegable "Quién realizó la calibración". Generado por extract_ranges.ps1. */
+/* TECNICOS:INICIO */
+var TECNICOS=["OTTO MARRUGO","O CANOLES","EDGAR GOMEZ","JOSE LUIS HERNANDEZ CASTILLA","ANDRES LANDINEZ","LUIS RICO","DEWIS MORENO","OVERMAR DIAZ","J.PANIZA","GERMAN BLANCO","VICTOR RAMOS","OSCAR CANOLES","HERNAN BETANCUR","JOSE GUARDO","GONZALO ARNEDO","ANTONIO JIMENEZ"];
+/* TECNICOS:FIN */
 function normTag(t){ return upNoAcc(t).replace(/[^A-Z0-9]+/g,""); }
 
 /* Datos de calibración = base incrustada (TAG_RANGES) + override adjuntado por el usuario
@@ -3146,12 +3155,13 @@ function procForTag(tag,name){ try{ var k=detectKey(tag,name||""); var e=k?MAP[k
 /* Salida máxima del grupo = base de "Pct of Range" (coincide con los límites de la base). */
 function grpOutMax(g){ var m=0; (g.pts||[]).forEach(function(p){ var o=pnum(p[1]); if(isFinite(o)&&Math.abs(o)>Math.abs(m)) m=o; }); return m; }
 /* % de desviación de un valor medido respecto al nominal de salida, según el tipo de precisión. */
-function desvPct(g,outNom,val){
+function desvPct(g,outNom,val,base){
   if(!isFinite(val)) return 0;
   var sa=String(g.sa||"").toLowerCase();
   if(sa.indexOf("reading")>=0 && outNom!==0) return (val-outNom)/outNom*100;
-  var base=grpOutMax(g); if(!base){ var mn=Infinity,mx=-Infinity; (g.pts||[]).forEach(function(p){var o=pnum(p[1]); if(o<mn)mn=o; if(o>mx)mx=o;}); base=(mx-mn)||1; }
-  return (val-outNom)/base*100;
+  var b=(isFinite(base)&&base!==0)?base:grpOutMax(g);   // base = salida máx del rango actual (o de la base)
+  if(!b){ var mn=Infinity,mx=-Infinity; (g.pts||[]).forEach(function(p){var o=pnum(p[1]); if(o<mn)mn=o; if(o>mx)mx=o;}); b=(mx-mn)||1; }
+  return (val-outNom)/b*100;
 }
 /* Aprobado si el valor cae dentro de los límites de la base; si faltan, por tolerancia. */
 function dentro(g,pt,val){
@@ -3161,6 +3171,55 @@ function dentro(g,pt,val){
   var outNom=pnum(pt[1]); var tol=Math.abs(desvPct(g,outNom,val));
   var acc=pnum(g.ra)*100; if(!isFinite(acc)||acc<=0) acc=pnum(g.rd)*100;
   return isFinite(acc)?(tol<=acc+1e-9):true;
+}
+/* Rango entrada/salida del grupo (extremos de los puntos), para repartir puntos nuevos. */
+function grpRange(pts){
+  if(!pts||!pts.length) return {iLo:0,iHi:0,oLo:0,oHi:0};
+  var a=pts[0], b=pts[pts.length-1];
+  return { iLo:pnum(a[0]), iHi:pnum(b[0]), oLo:pnum(a[1]), oHi:pnum(b[1]) };
+}
+/* Deriva el modelo de tolerancia de los puntos existentes. Devuelve una función tol(outNom, span) que
+   ESCALA con el rango (para que al editar el mín/máx de salida los límites sigan bien):
+   - constante (Pct of Range / Plus-Minus): tol = fracción-del-span × span actual.
+   - proporcional (Pct of Reading): tol = fracción × |salida nominal|.
+   Con el rango original reproduce los límites originales. */
+function deriveTol(pts){
+  var tols=[], props=[];
+  (pts||[]).forEach(function(p){
+    var o=pnum(p[1]), hi=pnum(p[3]); var t=(isFinite(hi)&&isFinite(o))?Math.abs(hi-o):NaN;
+    if(isFinite(t)){ tols.push(t); if(o!==0) props.push(t/Math.abs(o)); }
+  });
+  if(!tols.length) return function(){ return NaN; };
+  var span0=Math.abs(pnum(pts[pts.length-1][1])-pnum(pts[0][1]))||1;
+  var maxT=Math.max.apply(null,tols), minT=Math.min.apply(null,tols);
+  if(maxT-minT < 1e-6){ var fs=tols[0]/span0; return function(o,span){ return fs*(isFinite(span)?span:span0); }; } // constante ~ del span
+  if(props.length){ var maxP=Math.max.apply(null,props), minP=Math.min.apply(null,props);
+    if(maxP-minP < 1e-4){ var f=props[0]; return function(o){ return Math.abs(o)*f; }; } }                        // proporcional a la lectura
+  var avg=tols.reduce(function(a,b){return a+b;},0)/tols.length, fa=avg/span0; return function(o,span){ return fa*(isFinite(span)?span:span0); };
+}
+/* Base para el % de desviación (Pct of Range): salida máxima del rango ACTUAL del grupo. */
+function grpBase(G){ if(!G||!G.range) return NaN; return Math.max(Math.abs(pnum(G.range.oLo)),Math.abs(pnum(G.range.oHi))); }
+/* Recalcula la salida nominal y los límites de un punto a partir de su ENTRADA nominal (editable).
+   Salida = función de transferencia lineal del grupo [iLo,iHi] -> [oLo,oHi]. */
+function recomputePoint(G,r){
+  var rg=G.range, span=Math.abs(pnum(rg.oHi)-pnum(rg.oLo)), denom=(pnum(rg.iHi)-pnum(rg.iLo));
+  r.outNom = (denom!==0) ? (pnum(rg.oLo)+(pnum(rg.oHi)-pnum(rg.oLo))*(pnum(r.inNom)-pnum(rg.iLo))/denom) : pnum(rg.oLo);
+  var t=(G.tol||function(){return NaN;})(r.outNom, span);
+  r.lo=isFinite(t)?r.outNom-t:NaN; r.hi=isFinite(t)?r.outNom+t:NaN;
+}
+/* Regenera N puntos repartidos en el rango del grupo (salida lineal, límites por el modelo de tolerancia).
+   Enc./Dejado arrancan en el nominal (editables). N es "el número de puntos de calibración". */
+function regenPoints(G,N){
+  N=Math.max(2, Math.min(60, Math.round(N)||0));
+  var rg=G.range, tol=G.tol||function(){return NaN;}, span=Math.abs(pnum(rg.oHi)-pnum(rg.oLo)), rows=[];
+  for(var i=0;i<N;i++){
+    var f=(N===1)?0:i/(N-1);
+    var inNom=rg.iLo+(rg.iHi-rg.iLo)*f, outNom=rg.oLo+(rg.oHi-rg.oLo)*f;
+    var t=tol(outNom,span), lo=isFinite(t)?outNom-t:NaN, hi=isFinite(t)?outNom+t:NaN;
+    // Enc./Dejado arrancan en el nominal (calibración ideal); el técnico los edita.
+    rows.push({ inNom:inNom, outNom:outNom, lo:lo, hi:hi, found:outNom, left:outNom });
+  }
+  G.rows=rows;
 }
 
 var repState=null;   // {tag, rec, h:{...}, groups:[{meta, rows:[{inNom,outNom,lo,hi,found,left}]}]}
@@ -3175,7 +3234,10 @@ function buildRepBatch(){
     if(!r||!r.tag) return;
     var k=normTag(r.tag); if(!k||seen[k]) return;
     var rec=repLookup(r.tag); if(!rec) return;   // no está en la base de calibración -> se omite
-    seen[k]=1; REP_BATCH.push(repBuildState(rec));
+    var st=repBuildState(rec);
+    // Nr. de certificado = la Orden de Trabajo (OT) pegada de ese TAG (editable después).
+    if(r.ot!=null && String(r.ot).trim()!=="") st.h.ce=String(r.ot).trim();
+    seen[k]=1; REP_BATCH.push(st);
   });
 }
 /* Agrega un instrumento al lote (si no está) y devuelve su índice. */
@@ -3215,12 +3277,14 @@ function repBuildState(rec){
     res:"Calibración correcta"
   };
   var groups=(rec.g||[]).map(function(g){
-    var rows=(g.pts||[]).map(function(p){
+    var pts=(g.pts||[]).slice().sort(function(a,b){ return pnum(a[0])-pnum(b[0]); });
+    var rows=pts.map(function(p){
       var outNom=pnum(p[1]);
       return { inNom:pnum(p[0]), outNom:outNom, lo:pnum(p[2]), hi:pnum(p[3]),
                found:isFinite(outNom)?outNom:0, left:isFinite(outNom)?outNom:0 };
     });
-    return { meta:g, rows:rows };
+    // rango y modelo de tolerancia del grupo, para poder AGREGAR/quitar puntos manteniendo la fórmula.
+    return { meta:g, rows:rows, range:grpRange(pts), tol:deriveTol(pts) };
   });
   // std = lista de trabajo de patrones (arranca con los del último reporte; editable: se agregan/quitan
   // sin mutar el registro base rec.std). Copia superficial de cada fila.
@@ -3229,6 +3293,22 @@ function repBuildState(rec){
 }
 /* Catálogo de patrones para el selector (override adjuntado o incrustado). */
 function testInstrSrc(){ return (CAL_OVERRIDE&&CAL_OVERRIDE.patrones)?CAL_OVERRIDE.patrones:TEST_INSTR; }
+/* Lista de técnicos para el desplegable (override adjuntado o incrustado). */
+function tecnicoSrc(){ return (CAL_OVERRIDE&&CAL_OVERRIDE.tecnicos&&CAL_OVERRIDE.tecnicos.length)?CAL_OVERRIDE.tecnicos:TECNICOS; }
+function renderRepTecnicos(){
+  var sel=document.getElementById("repTecnico"); if(!sel) return;
+  var list=tecnicoSrc()||[];
+  var html='<option value="">— Selecciona técnico (aplica a todos) —</option>';
+  list.forEach(function(n){ html+='<option value="'+escA(n)+'">'+esc(n)+'</option>'; });
+  sel.innerHTML=html;
+}
+/* Pone el técnico seleccionado en TODOS los reportes del lote (y en el actual). Editable después. */
+function repSetTecnicoAll(name){
+  if(!name) return;
+  REP_BATCH.forEach(function(st){ st.h.by=name; });
+  if(repState){ repState.h.by=name; }
+  repRenderForm();
+}
 function repAllOk(){
   if(!repState) return true;
   for(var i=0;i<repState.groups.length;i++){ var G=repState.groups[i];
@@ -3250,9 +3330,13 @@ function repRenderForm(){
   var rec=repState.rec, h=repState.h;
   var head='<div class="rowhead"><div><strong>'+esc(rec.tag)+'</strong> · '+esc(rec.n||"")+'</div>'+
            '<code>'+esc(rec.co||"")+'</code></div>';
-  var grid='<div class="rgrid">';
+  // datalist de técnicos para el campo "Quién realizó la calibración" (se puede elegir o escribir).
+  var tecList=tecnicoSrc()||[];
+  var dl='<datalist id="repTecList">'+tecList.map(function(n){ return '<option value="'+escA(n)+'">'; }).join("")+'</datalist>';
+  var grid=dl+'<div class="rgrid">';
   REP_FIELDS.forEach(function(fd){
-    grid+='<div><label>'+esc(fd[0])+'</label><input type="text" data-h="'+fd[1]+'" value="'+escA(h[fd[1]])+'"></div>';
+    var extra=(fd[1]==="by")?' list="repTecList"':'';
+    grid+='<div><label>'+esc(fd[0])+'</label><input type="text" data-h="'+fd[1]+'"'+extra+' value="'+escA(h[fd[1]])+'"></div>';
   });
   grid+='<div class="full"><label>Nota sobre esta calibración</label><textarea data-h="nt" rows="4" style="width:100%">'+esc(h.nt)+'</textarea></div>';
   grid+='<div class="full"><label>Resultado de calibración</label><input type="text" data-h="res" value="'+escA(h.res)+'"></div>';
@@ -3263,13 +3347,26 @@ function repRenderForm(){
     var acc=(isFinite(pnum(g.ra))?(pnum(g.ra)*100).toFixed(4):"")+"";
     tbls+='<div class="grpblock"><h4>Grupo '+esc(g.gn)+' · '+esc(g.sa||"")+
           (acc?(' · % prec. rango '+acc):'')+'</h4>'+
+          '<div style="margin:0 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+            '<label style="margin:0">N.º de puntos</label>'+
+            '<input type="number" min="2" max="60" step="1" data-gpts="'+gi+'" value="'+G.rows.length+'" style="width:70px">'+
+            '<label style="margin:0 0 0 10px">Entrada mín ('+esc(g.it||"")+')</label>'+
+            '<input type="number" step="any" data-gimin="'+gi+'" value="'+escA(fmtNum(G.range.iLo))+'" style="width:90px">'+
+            '<label style="margin:0">Entrada máx</label>'+
+            '<input type="number" step="any" data-gimax="'+gi+'" value="'+escA(fmtNum(G.range.iHi))+'" style="width:90px">'+
+            '<label style="margin:0 0 0 10px">Salida mín ('+esc(g.ot||"")+')</label>'+
+            '<input type="number" step="any" data-gomin="'+gi+'" value="'+escA(fmtNum(G.range.oLo))+'" style="width:90px">'+
+            '<label style="margin:0">Salida máx</label>'+
+            '<input type="number" step="any" data-gomax="'+gi+'" value="'+escA(fmtNum(G.range.oHi))+'" style="width:90px">'+
+          '</div>'+
+          '<p class="hint" style="margin:-4px 0 8px">Aplica a <b>cualquier instrumento</b>: cambia el N.º de puntos, el <b>mín/máx de entrada</b> o de <b>salida</b>, o edita la <b>Entrada nominal</b> de cada punto; la salida nominal, los límites y la desviación se recalculan (la entrada máx mapea a la salida máx). Todo se guarda en la base al exportar el JSON.</p>'+
           '<div class="caltbl-wrap"><table class="caltbl"><thead><tr>'+
-          '<th>Entrada nominal</th><th>Salida nominal</th><th>Enc. como ('+esc(g.ot||"")+')</th>'+
+          '<th>Entrada nominal ('+esc(g.it||"")+')</th><th>Salida nominal</th><th>Enc. como ('+esc(g.ot||"")+')</th>'+
           '<th>Dejado como ('+esc(g.ot||"")+')</th><th>% de desv</th><th>Resultado</th></tr></thead><tbody>';
     G.rows.forEach(function(r,pi){
       tbls+='<tr data-g="'+gi+'" data-p="'+pi+'">'+
-        '<td>'+esc(fmtNum(r.inNom))+' '+esc(g.it||"")+'</td>'+
-        '<td>'+esc(fmtNum(r.outNom))+' '+esc(g.ot||"")+'</td>'+
+        '<td><input type="text" inputmode="decimal" data-g="'+gi+'" data-p="'+pi+'" data-k="inNom" value="'+escA(fmtNum(r.inNom))+'"></td>'+
+        '<td class="cell-outnom">'+esc(fmtNum(r.outNom))+' '+esc(g.ot||"")+'</td>'+
         '<td><input type="text" inputmode="decimal" data-g="'+gi+'" data-p="'+pi+'" data-k="found" value="'+escA(fmtNum(r.found))+'"></td>'+
         '<td><input type="text" inputmode="decimal" data-g="'+gi+'" data-p="'+pi+'" data-k="left" value="'+escA(fmtNum(r.left))+'"></td>'+
         '<td class="cell-desv"></td><td class="cell-res"></td></tr>';
@@ -3310,7 +3407,7 @@ function repUpdateRow(gi,pi){
   var G=repState.groups[gi], r=G.rows[pi];
   var tr=document.querySelector('#repForm tr[data-g="'+gi+'"][data-p="'+pi+'"]'); if(!tr) return;
   var val=isFinite(r.left)?r.left:r.found;
-  var desv=desvPct(G.meta,r.outNom,val);
+  var desv=desvPct(G.meta,r.outNom,val,grpBase(G));
   var ok=dentro(G.meta,[r.inNom,r.outNom,r.lo,r.hi],val);
   var cd=tr.querySelector(".cell-desv"), cr=tr.querySelector(".cell-res");
   cd.textContent=fmtPct(desv);
@@ -3359,9 +3456,10 @@ function repSpecBox(G){
   s+='<table class="rp-data rp-pts"><thead><tr>'+
      '<th>Valor de entrada nominal / Valor de entrada</th><th>En tipo</th><th>Valor de salida</th><th>Tipo sal.</th>'+
      '<th>Enc. como</th><th>Dejado como</th><th>% de desv</th><th>Aprobado/Fallado</th></tr></thead><tbody>';
+  var base=grpBase(G);
   G.rows.forEach(function(r){
     var val=isFinite(r.left)?r.left:r.found;
-    var desv=desvPct(g,r.outNom,val), ok=dentro(g,[r.inNom,r.outNom,r.lo,r.hi],val);
+    var desv=desvPct(g,r.outNom,val,base), ok=dentro(g,[r.inNom,r.outNom,r.lo,r.hi],val);
     s+='<tr><td>'+esc(fmtNum(r.inNom))+' / '+esc(fmtNum(r.inNom))+'</td><td>'+esc(g.it||"")+'</td>'+
        '<td>'+esc(fmtNum(r.outNom))+'</td><td>'+esc(g.ot||"")+'</td>'+
        '<td>'+esc(fmtNum(r.found))+'</td><td>'+esc(fmtNum(r.left))+'</td>'+
@@ -3456,9 +3554,15 @@ function repDescargarTodos(){
 function repGrabarPayload(st){
   st=st||repState; var h=st.h, rec=st.rec;
   var grupos=st.groups.map(function(G){
-    return { gn:G.meta.gn, puntos:G.rows.map(function(r,i){
-      return { pos:i+1, inNom:r.inNom, outNom:r.outNom, low:r.lo, high:r.hi, found:r.found, left:r.left };
-    }) };
+    var ins=G.rows.map(function(r){return pnum(r.inNom);}).filter(isFinite);
+    var outs=G.rows.map(function(r){return pnum(r.outNom);}).filter(isFinite);
+    return { gn:G.meta.gn,
+      // rango del grupo = extremos de los puntos actuales (refleja entrada editada y mín/máx de salida)
+      inLow:ins.length?Math.min.apply(null,ins):null, inHigh:ins.length?Math.max.apply(null,ins):null,
+      outLow:outs.length?Math.min.apply(null,outs):null, outHigh:outs.length?Math.max.apply(null,outs):null,
+      puntos:G.rows.map(function(r,i){
+        return { pos:i+1, inNom:r.inNom, outNom:r.outNom, low:r.lo, high:r.hi, found:r.found, left:r.left };
+      }) };
   });
   return {
     tag:rec.tag, nombre:rec.n||"", empresa:rec.co||"",
@@ -3497,11 +3601,35 @@ function repGrabar(){
     if(el.hasAttribute("data-h")){ repState.h[el.getAttribute("data-h")]=el.value; return; }
     if(el.hasAttribute("data-k")){
       var gi=+el.getAttribute("data-g"), pi=+el.getAttribute("data-p"), k=el.getAttribute("data-k");
-      repState.groups[gi].rows[pi][k]=pnum(el.value);
+      var G=repState.groups[gi], r=G.rows[pi];
+      if(k==="inNom"){
+        // Editar la Entrada nominal recalcula la Salida nominal y los límites; si Enc./Dejado estaban en el
+        // nominal (sin tocar), se sincronizan al nuevo nominal.
+        var oldOut=r.outNom, syncF=(r.found===oldOut), syncL=(r.left===oldOut);
+        r.inNom=pnum(el.value); recomputePoint(G,r);
+        if(syncF) r.found=r.outNom; if(syncL) r.left=r.outNom;
+        var tr=document.querySelector('#repForm tr[data-g="'+gi+'"][data-p="'+pi+'"]');
+        if(tr){ var oc=tr.querySelector(".cell-outnom"); if(oc) oc.textContent=fmtNum(r.outNom)+" "+(G.meta.ot||"");
+          if(syncF){ var fi=tr.querySelector('input[data-k="found"]'); if(fi) fi.value=fmtNum(r.found); }
+          if(syncL){ var li=tr.querySelector('input[data-k="left"]'); if(li) li.value=fmtNum(r.left); } }
+      } else { r[k]=pnum(el.value); }
       repUpdateRow(gi,pi);
       var rf=document.querySelector('[data-h="res"]');
       if(rf){ var v=repAllOk()?"Calibración correcta":"Calibración con desviación"; repState.h.res=v; rf.value=v; }
     }
+  });
+  // Cambiar el N.º de puntos o el mín/máx de salida de un grupo (regenera los puntos y recalcula).
+  f.addEventListener("change", function(e){
+    var el=e.target; if(!repState || !el.hasAttribute) return;
+    var G, v;
+    if(el.hasAttribute("data-gpts")){ G=repState.groups[+el.getAttribute("data-gpts")]; if(!G) return; regenPoints(G, pnum(el.value)); }
+    else if(el.hasAttribute("data-gimin")){ G=repState.groups[+el.getAttribute("data-gimin")]; if(!G) return; v=pnum(el.value); if(isFinite(v)){ G.range.iLo=v; regenPoints(G, G.rows.length); } }
+    else if(el.hasAttribute("data-gimax")){ G=repState.groups[+el.getAttribute("data-gimax")]; if(!G) return; v=pnum(el.value); if(isFinite(v)){ G.range.iHi=v; regenPoints(G, G.rows.length); } }
+    else if(el.hasAttribute("data-gomin")){ G=repState.groups[+el.getAttribute("data-gomin")]; if(!G) return; v=pnum(el.value); if(isFinite(v)){ G.range.oLo=v; regenPoints(G, G.rows.length); } }
+    else if(el.hasAttribute("data-gomax")){ G=repState.groups[+el.getAttribute("data-gomax")]; if(!G) return; v=pnum(el.value); if(isFinite(v)){ G.range.oHi=v; regenPoints(G, G.rows.length); } }
+    else return;
+    repState.h.res = repAllOk()?"Calibración correcta":"Calibración con desviación";
+    repRenderForm();
   });
   // Agregar / quitar patrones de calibración con el selector.
   f.addEventListener("click", function(e){
@@ -3524,6 +3652,10 @@ function repGrabar(){
   document.getElementById("repSelect").addEventListener("change", function(e){
     var v=e.target.value; if(v==="") { repState=null; document.getElementById("repMsg").innerHTML=""; repRenderForm(); return; }
     repSelectShow(+v);
+  });
+  renderRepTecnicos();
+  document.getElementById("repTecnico").addEventListener("change", function(e){
+    if(e.target.value) repSetTecnicoAll(e.target.value);   // aplica el técnico a todos los reportes
   });
   document.getElementById("repBuscar").addEventListener("click", repSearch);
   document.getElementById("repTag").addEventListener("keydown", function(e){ if(e.key==="Enter") repSearch(); });

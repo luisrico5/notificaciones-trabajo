@@ -76,6 +76,18 @@ DPCTrack2, a partir de un TAG.
 > Los datos salen de la misma base incrustada (o del `datos_calibracion.json` adjunto). Si el TAG no está,
 > avisa y no inventa nada.
 
+**Por lote:** al **procesar el pegado o el Excel** en Notificaciones se generan también los reportes de
+todos los instrumentos que estén en la base; en la pestaña de reporte hay un **desplegable** para revisarlos
+y editarlos uno por uno.
+
+**Descargar PDF:** además de *Generar reporte (PDF)* (diálogo de impresión, vectorial), hay
+**Descargar reporte (PDF)** (baja directo el del instrumento actual) y **Descargar todos (PDF)** (baja
+**un PDF por instrumento**).
+
+**Grabar a la base de datos:** el botón **descarga un JSON** con todos los instrumentos para meterlos a la
+base editable y que DPCTrack los lea igual. El paso a paso está en
+**[ACTUALIZAR-BASE-DE-DATOS.md](ACTUALIZAR-BASE-DE-DATOS.md)**.
+
 ## Mapeo TAG → Procedimiento
 El mapeo ya viene **pre-cargado** con los procedimientos P-SG y sus puntos clave, extraídos de los
 tableros de NotebookLM *notificaciones* y *notificaciones 1*.

@@ -111,12 +111,17 @@ function Process-Cal($conn,$tx,$d,$cid,$note,$now){
     if($null -eq $lo -or $null -eq $hi){ return $true }
     return ($val -ge $lo - 1e-9 -and $val -le $hi + 1e-9)
   }
-  # Resultado global
+  # Resultado global (desde los puntos del reporte, no de la plantilla)
   $anyFail=$false; $anyFoundFail=$false
-  foreach($row in $dtDet.Rows){
-    $gn=[int]$row['GroupNumber']; $pos=[int]$row['Position']; $rt=[string]$row['READINGTYPE']
-    $v=$read["$gn|$pos|$rt"]
-    if(-not (& $inlim $gn $pos $v)){ $anyFail=$true; if($rt -eq 'FoundAs'){ $anyFoundFail=$true } }
+  foreach($g in $d.grupos){
+    $gn=[int]$g.gn; $pos=0
+    foreach($pt in $g.puntos){
+      $pos=[int]$pt.pos
+      foreach($rt in @('FoundAs','LeftAs')){
+        $v = if($rt -eq 'FoundAs'){ Dbl $pt.found } else { Dbl $pt.left }
+        if(-not (& $inlim $gn $pos $v)){ $anyFail=$true; if($rt -eq 'FoundAs'){ $anyFoundFail=$true } }
+      }
+    }
   }
   $grpStatus = if($anyFail){'Fail'}else{'Pass'}
 
@@ -135,20 +140,41 @@ function Process-Cal($conn,$tx,$d,$cid,$note,$now){
     ITEMNAME=([string]$d.nombre)
   }
   Insert-Hash $conn $tx $dtCal "CALIBRAT" (Row-Hash $dtCal $dtCal.Rows[0] $ovCal)
-  # 3) CalGroups
+  # 3) CalGroups (Divisions = N.º de puntos; OutputLowRange/HighRange = mín/máx de salida editados)
   foreach($row in $dtGrp.Rows){
-    Insert-Hash $conn $tx $dtGrp "CalGroups" (Row-Hash $dtGrp $row @{ CalibrationID=$cid; ASFOUNDSTATUS=$grpStatus; ASLEFTSTATUS=$grpStatus })
-  }
-  # 4) CALDET
-  foreach($row in $dtDet.Rows){
-    $gn=[int]$row['GroupNumber']; $pos=[int]$row['Position']; $rt=[string]$row['READINGTYPE']
-    $v=$read["$gn|$pos|$rt"]
-    $ov=@{ CalibrationID=$cid }
-    if($null -ne $v){
-      $rs='Pass'; if(-not (& $inlim $gn $pos $v)){ $rs='Fail' }
-      $ov['Reading']=$v; $ov['ReadingEntered']=$true; $ov['RESULTSTATUS']=$rs
+    $gn=[int]$row['GroupNumber']
+    $jg = $d.grupos | Where-Object { [int]$_.gn -eq $gn } | Select-Object -First 1
+    $ovG = @{ CalibrationID=$cid; ASFOUNDSTATUS=$grpStatus; ASLEFTSTATUS=$grpStatus }
+    if($jg){
+      $ovG['Divisions'] = @($jg.puntos).Count
+      $iLo = Dbl $jg.inLow;  $iHi = Dbl $jg.inHigh
+      $oLo = Dbl $jg.outLow; $oHi = Dbl $jg.outHigh
+      if($null -ne $iLo){ $ovG['InputLowRange']   = $iLo }
+      if($null -ne $iHi){ $ovG['InputHighRange']  = $iHi }
+      if($null -ne $oLo){ $ovG['OutputLowRange']  = $oLo }
+      if($null -ne $oHi){ $ovG['OutputHighRange'] = $oHi }
     }
-    Insert-Hash $conn $tx $dtDet "CALDET" (Row-Hash $dtDet $row $ov)
+    Insert-Hash $conn $tx $dtGrp "CalGroups" (Row-Hash $dtGrp $row $ovG)
+  }
+  # 4) CALDET: se construye desde los puntos del reporte (soporta puntos agregados/quitados). Cada punto
+  #    genera 2 filas (FoundAs/LeftAs). Se usa una fila plantilla del mismo grupo para las columnas fijas.
+  foreach($g in $d.grupos){
+    $gn=[int]$g.gn
+    $tplRow = ($dtDet.Rows | Where-Object { [int]$_['GroupNumber'] -eq $gn } | Select-Object -First 1)
+    if($null -eq $tplRow){ if($dtDet.Rows.Count -gt 0){ $tplRow=$dtDet.Rows[0] } else { throw "Sin plantilla CALDET para $tag" } }
+    $p=0
+    foreach($pt in $g.puntos){
+      $p++
+      $inNom=(Dbl $pt.inNom); $outNom=(Dbl $pt.outNom); $lo=(Dbl $pt.low); $hi=(Dbl $pt.high)
+      foreach($rt in @('FoundAs','LeftAs')){
+        $v = if($rt -eq 'FoundAs'){ Dbl $pt.found } else { Dbl $pt.left }
+        $rs='Pass'; if(($null -ne $lo) -and ($null -ne $hi) -and ($null -ne $v) -and (($v -lt $lo-1e-9) -or ($v -gt $hi+1e-9))){ $rs='Fail' }
+        $ov=@{ CalibrationID=$cid; GroupNumber=$gn; Position=$p; READINGTYPE=$rt;
+          InputSignal=$inNom; OutputSignal=$outNom; NominalInputSignal=$inNom;
+          LowLimit=$lo; HighLimit=$hi; Reading=$v; ReadingEntered=$true; RESULTSTATUS=$rs }
+        Insert-Hash $conn $tx $dtDet "CALDET" (Row-Hash $dtDet $tplRow $ov)
+      }
+    }
   }
   # 5) CALTEST
   $comp=[string]$dtCal.Rows[0]['COMPANYNAME']
@@ -168,7 +194,7 @@ if ($list.Count -eq 0) { throw "El JSON no trae calibraciones." }
 
 $conn = New-Conn
 Write-Host "Base editable: $Mdb"
-Write-Host ("Instrumentos en el archivo: " + $list.Count)
+Write-Host ("Instrumentos en el archivo: " + @($list).Count)
 $now = Get-Date
 $nextCid  = [int]((Q $conn "SELECT MAX(CalibrationID) AS m FROM CALIBRAT").Rows[0]['m']) + 1
 $nextNote = [int]((Q $conn "SELECT MAX(NoteID) AS m FROM PCNotes").Rows[0]['m']) + 1

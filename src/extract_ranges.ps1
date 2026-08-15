@@ -255,6 +255,19 @@ $conn4.Close()
 $tiJson = ($ti | ConvertTo-Json -Depth 4 -Compress)
 Write-Host ("Patrones en catálogo (TEST_INSTR): " + $ti.Count)
 
+# --- Lista de técnicos (WHOCALIBRATED) para el desplegable "Quién realizó la calibración" ---
+$conn5 = New-Conn
+$tecList = @()
+foreach ($r in (Q $conn5 ("SELECT WHOCALIBRATED, COUNT(*) AS n FROM CALIBRAT WHERE ITEMTYPE='Instrument' " +
+    "AND WHOCALIBRATED IS NOT NULL AND WHOCALIBRATED<>'' GROUP BY WHOCALIBRATED ORDER BY COUNT(*) DESC")).Rows) {
+  $nm = (Str $r['WHOCALIBRATED']).Trim()
+  if ($nm -ne '' -and $nm -ne 'Technician' -and $nm -ne 'User' -and [int]$r['n'] -ge 2) { $tecList += $nm }
+}
+$conn5.Close()
+$tecJson = ($tecList | ConvertTo-Json -Depth 2 -Compress)
+if ($tecList.Count -eq 1) { $tecJson = "[" + $tecJson + "]" }   # ConvertTo-Json de 1 elemento no lleva corchetes
+Write-Host ("Técnicos (TECNICOS): " + $tecList.Count)
+
 # --- Serializar TAG_RANGES (JSON compacto manual) ---
 function Esc($s) { ([string]$s) -replace '\\', '\\' -replace '"', '\"' }
 function TagJson($e) {
@@ -282,12 +295,16 @@ $bloqueTi = "var TEST_INSTR=" + $tiJson + ";"
 $reTi = '(?s)(/\* TEST_INSTR:INICIO \*/).*?(/\* TEST_INSTR:FIN \*/)'
 if ($tail -notmatch $reTi) { throw "No encontre los marcadores TEST_INSTR en part_tail.html" }
 $tail = [regex]::Replace($tail, $reTi, { param($m) $m.Groups[1].Value + "`r`n" + $bloqueTi + "`r`n" + $m.Groups[2].Value })
+$bloqueTec = "var TECNICOS=" + $tecJson + ";"
+$reTec = '(?s)(/\* TECNICOS:INICIO \*/).*?(/\* TECNICOS:FIN \*/)'
+if ($tail -notmatch $reTec) { throw "No encontre los marcadores TECNICOS en part_tail.html" }
+$tail = [regex]::Replace($tail, $reTec, { param($m) $m.Groups[1].Value + "`r`n" + $bloqueTec + "`r`n" + $m.Groups[2].Value })
 Set-Content -Path $tailPath -Value $tail -Encoding UTF8 -NoNewline
 
 # 2) Escribir el archivo portable que el dashboard puede adjuntar a futuro para actualizar su escaneo.
 $jsonPath = Join-Path (Split-Path -Parent $tailPath) "..\datos_calibracion.json"
 $hoy = (Get-Date).ToString("yyyy-MM-dd")
-$json = '{"version":2,"generado":"' + $hoy + '","tags":{' + "`r`n" + $cuerpo + "`r`n},"+'"reportes":' + $repJson + ',"patrones":' + $tiJson + '}'
+$json = '{"version":2,"generado":"' + $hoy + '","tags":{' + "`r`n" + $cuerpo + "`r`n},"+'"reportes":' + $repJson + ',"patrones":' + $tiJson + ',"tecnicos":' + $tecJson + '}'
 Set-Content -Path $jsonPath -Value $json -Encoding UTF8 -NoNewline
 Write-Host ("Generado: " + (Resolve-Path $jsonPath).Path)
 Write-Host "part_tail.html actualizado. Ahora: powershell -ExecutionPolicy Bypass -File build.ps1"

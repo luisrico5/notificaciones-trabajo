@@ -147,6 +147,35 @@ está en medio y el archivo se regenera).
   mutan el registro base), se listan con opción de quitar, se deduplican por código y `repStdBox` concatena
   por-defecto + añadidos. Fuente: `testInstrSrc()` (override `CAL_OVERRIDE.patrones` o `TEST_INSTR`
   incrustado). `TEST_INSTR` se genera en el mismo `extract_ranges.ps1`.
+  **Desplegable "Quién realizó la calibración"** (`TECNICOS` + `repTecnico`/`renderRepTecnicos`/`repSetTecnicoAll`):
+  la lista de técnicos sale de `WHOCALIBRATED` (base, por frecuencia, ≥2, sin User/Technician), se incrusta
+  como `TECNICOS` (fuente `tecnicoSrc()` = override `CAL_OVERRIDE.tecnicos` o incrustado) y alimenta un
+  desplegable en la pestaña que **aplica el nombre a TODOS los reportes del lote**. El campo por reporte
+  sigue **editable** (input con `list="repTecList"`: se elige del datalist o se escribe a mano).
+  **N.º de puntos por grupo (agregar/quitar puntos)** (`grpRange`/`deriveTol`/`regenPoints` + input `data-gpts`):
+  cada grupo tiene un campo "N.º de puntos de calibración"; al cambiarlo, `regenPoints` reparte N puntos en el
+  rango del instrumento (`G.range`, extremos de los `pts`), salida lineal, límites por el modelo de tolerancia
+  del grupo (`deriveTol`: constante para *Pct of Range*/*Plus-Minus*, proporcional a la lectura para *Pct of
+  Reading*), Enc./Dejado arrancan en el nominal (editables); la desviación se recalcula. Al **exportar el JSON**,
+  `repGrabarPayload` incluye todos los puntos y `grabar_reporte.ps1` **construye `CALDET` desde los puntos del
+  reporte** (2 filas por punto) y fija `CalGroups.Divisions = N`, así DPCTrack muestra el grupo con esa cantidad
+  de campos. **Aplica a cualquier instrumento** (no solo WT).
+  **Entrada nominal editable** (input `data-k="inNom"` por punto + `recomputePoint`): al editar la entrada
+  nominal de un punto, la **salida nominal se recalcula** por la función de transferencia lineal del grupo
+  (`[iLo,iHi]→[oLo,oHi]`), junto con los límites y el % de desviación; si Enc./Dejado estaban en el nominal
+  (sin tocar) se sincronizan. La celda de salida es `.cell-outnom`. Al exportar, `CALDET.InputSignal` y
+  `NominalInputSignal` llevan la entrada editada y `CalGroups.InputLowRange/HighRange` = extremos de los puntos.
+  **Mín/máx de entrada y de salida editables** (inputs `data-gimin`/`data-gimax` y `data-gomin`/`data-gomax`
+  por grupo): cambian `G.range.iLo`/`iHi`/`oLo`/`oHi`; `regenPoints` reparte los N puntos en el nuevo rango,
+  con salida lineal (**la entrada máx mapea a la salida máx**) y límites por el modelo `deriveTol` (**escala
+  con el span**: fracción-del-span × span actual para *Pct of Range*, así ±tol crece/decrece con el rango);
+  el `% de desv` usa `grpBase(G)` = salida máx del rango ACTUAL (por eso `desvPct` acepta `base`). Al exportar,
+  el grupo lleva `inLow/inHigh/outLow/outHigh` (extremos de los puntos) y `grabar_reporte.ps1` fija
+  `CalGroups.InputLowRange/InputHighRange/OutputLowRange/OutputHighRange` (+ el `Input/OutputSignal` de cada
+  CALDET ya sale recalculado).
+  **Nr. de certificado = OT** (`buildRepBatch`): al procesar el pegado/Excel, el certificado de cada reporte
+  arranca con la **Orden de Trabajo (OT)** de esa fila (`st.h.ce=r.ot`), no con el certificado del último
+  reporte de la base. Editable después.
   **Generación por lote** (`REP_BATCH`/`buildRepBatch`/`renderRepSelect`/`repSelectShow`): al **procesar el
   pegado o el Excel** en Notificaciones, además de las plantillas `.txt`, se generan los reportes de
   calibración de cada orden cuyo TAG esté en la base (`repLookup`); los que no estén se **omiten**. La

@@ -6,4 +6,7 @@ zzz/
 # PDFs de referencia (informes DPCTrack de ejemplo) — material de entrada, no del entregable.
 *.pdf
 
+# JSON que descarga el botón "Grabar a la base de datos" (entrada para grabar_reporte.ps1) — datos de planta.
+grabar_*.json
+
 # Los rangos ya quedan incrustados en index.html; la base no se necesita para el sitio.
