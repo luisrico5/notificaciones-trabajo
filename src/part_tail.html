@@ -3171,8 +3171,35 @@ function repBuildHtml(){
   return html;
 }
 /* "Generar reporte (PDF)": abre la ventana de impresión del navegador (Guardar como PDF, vectorial). */
+/* Vuelca al estado (repState) las ediciones del formulario que se aplican en el evento 'change' — N.º de
+   puntos y mín/máx de entrada/salida de cada grupo — ANTES de exportar/generar. Sin esto, si el técnico
+   cambia el N.º de puntos (o un rango) y hace clic DIRECTO en "Grabar"/"Descargar"/"Generar" sin salir
+   del campo, el 'change' no habría corrido y el JSON/PDF saldría con los valores viejos. Es idempotente:
+   solo regenera los puntos cuando el DOM y el estado difieren (y en ese caso aún no hay lecturas
+   Enc./Dejado que perder). Solo puede afectar al instrumento visible; los demás ya se confirmaron al
+   cambiar de instrumento en el desplegable (ese cambio también dispara el 'change' pendiente). */
+function repFlushEdits(){
+  if(!repState) return;
+  var f=document.getElementById("repForm"); if(!f || f.style.display==="none") return;
+  var ae=document.activeElement;
+  if(ae && typeof ae.blur==="function" && f.contains(ae)) ae.blur();   // intenta disparar el 'change' pendiente
+  var eq=function(a,b){ return Math.abs(pnum(a)-pnum(b))<1e-9; };
+  repState.groups.forEach(function(G,gi){
+    var rd=function(sel,def){ var el=f.querySelector(sel); if(!el) return def; var v=pnum(el.value); return isFinite(v)?v:def; };
+    var iLo=rd('[data-gimin="'+gi+'"]',G.range.iLo), iHi=rd('[data-gimax="'+gi+'"]',G.range.iHi);
+    var oLo=rd('[data-gomin="'+gi+'"]',G.range.oLo), oHi=rd('[data-gomax="'+gi+'"]',G.range.oHi);
+    var nEl=f.querySelector('[data-gpts="'+gi+'"]');
+    var n=nEl?Math.max(2,Math.min(60,Math.round(pnum(nEl.value))||G.rows.length)):G.rows.length;
+    var rangeChanged=!(eq(iLo,G.range.iLo)&&eq(iHi,G.range.iHi)&&eq(oLo,G.range.oLo)&&eq(oHi,G.range.oHi));
+    if(rangeChanged || n!==G.rows.length){
+      G.range.iLo=iLo; G.range.iHi=iHi; G.range.oLo=oLo; G.range.oHi=oHi;
+      regenPoints(G, n);
+    }
+  });
+}
 function repGenerar(){
   if(!repState){ alert("Elige un instrumento en la lista o busca un TAG."); return; }
+  repFlushEdits();
   document.getElementById("reportPrint").innerHTML='<div class="rp-doc">'+repBuildHtml()+'</div>';
   window.print();
 }
@@ -3203,11 +3230,13 @@ function repPdfFrom(state, filename){
 /* "Descargar reporte (PDF)": baja directamente el PDF del instrumento seleccionado. */
 function repDescargar(){
   if(!repState){ alert("Elige un instrumento en la lista o busca un TAG."); return; }
+  repFlushEdits();
   repPdfFrom(repState, (repState.rec.tag||"reporte")+".pdf");
 }
 /* "Descargar todos (PDF)": baja directamente UN PDF POR INSTRUMENTO (secuencial, sin diálogos). */
 function repDescargarTodos(){
   if(!REP_BATCH.length){ alert("No hay reportes cargados. Procesa datos en Notificaciones o busca un TAG."); return; }
+  repFlushEdits();
   var i=0;
   function next(){ if(i>=REP_BATCH.length) return; var st=REP_BATCH[i++]; repPdfFrom(st,(st.rec.tag||("reporte"+i))+".pdf").then(next); }
   next();
@@ -3237,6 +3266,7 @@ function repGrabarPayload(st){
 }
 /* Descarga UN SOLO JSON con TODOS los instrumentos cargados (para actualizar la base de una vez). */
 function repGrabar(){
+  repFlushEdits();   // vuelca al estado el N.º de puntos / rangos que el técnico dejó sin confirmar (clic directo)
   var list = REP_BATCH.length ? REP_BATCH : (repState?[repState]:[]);
   if(!list.length){ alert("No hay reportes cargados. Procesa datos en la pestaña Notificaciones o busca un TAG."); return; }
   var cals=list.map(function(st){ return repGrabarPayload(st); });
