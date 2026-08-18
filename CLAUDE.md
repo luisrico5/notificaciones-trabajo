@@ -33,7 +33,10 @@ src/
                          datos_calibracion.json ({tags, reportes, patrones}).
   grabar_reporte.ps1  <- Inserta en la base EDITABLE la calibración generada por el dashboard (del JSON del
                          botón "Grabar a la base de datos"), copiando la última calib. como plantilla para
-                         que DPCTrack la lea igual. Nunca toca la contraseña ni la base _backup.
+                         que DPCTrack la lea igual. TAMBIÉN actualiza la especificación (InstSpecGroup +
+                         INSTSPEC) con el N.º de puntos/nominales/rangos del reporte, porque DPCTrack arma el
+                         reporte desde la spec, no desde la calibración (usa -NoSpec para no tocar la spec).
+                         Nunca toca la contraseña ni la base _backup.
 datos_calibracion.json <- Datos de calibración portables (para adjuntar en la app). Generado.
 .gitignore            <- Excluye *.mdb y zzz/ (no publicar base ni binarios).
 20260810_dpctrack2_backup.mdb    <- Base DPCTrack2 (Jet 4, clave en zzz\PasswordReset.exe). SOLO CONSULTA (ver regla). NO PUBLICAR.
@@ -198,9 +201,17 @@ está en medio y el archivo se regenera).
   instrumento como plantilla** (todas las columnas de `CALIBRAT`/`CalGroups`/`CALDET`) y solo sobrescribe lo
   nuevo (IDs `MAX+1` — no hay autonumber —, fecha, técnico, temp/humedad, certificado, tipo, `Reading` de
   cada punto = valor Enc./Dejado, `RESULTSTATUS` por límites, `Failed`/`AsFound`), reconstruye `CALTEST`
-  desde los patrones del reporte y crea `PCNotes` (`NoteID` `MAX+1`). Acepta **uno o varios** instrumentos
+  desde los patrones del reporte y crea `PCNotes` (`NoteID` `MAX+1`). **Además actualiza la ESPECIFICACIÓN**
+  del instrumento (`Update-Spec`), porque **DPCTrack arma el reporte desde la spec, no desde la calibración**:
+  por cada grupo del JSON fija `InstSpecGroup.Divisions` = N.º de puntos y `Input/OutputLowRange/HighRange` =
+  mín/máx, y **reemplaza las filas de `INSTSPEC`** (borra las viejas e inserta N nuevas con
+  `Position/InputSignal/OutputSignal/LowLimit/HighLimit` del reporte, copiando el resto de columnas —tipos de
+  señal, precisión, resoluciones— de una fila plantilla del mismo grupo). Sin esto, cambiar puntos/rangos en
+  el dashboard **no se reflejaba** en DPCTrack. El modificador **`-NoSpec`** graba solo la calibración sin
+  tocar la spec. Acepta **uno o varios** instrumentos
   (`$d.calibraciones`): itera con IDs incrementales, todo en **una transacción** (atómico; `Q` lleva la
-  transacción en cada SELECT); omite (con aviso) los que no tengan calibración previa de plantilla. Fija el
+  transacción en cada SELECT; `Exec` corre los UPDATE/DELETE parametrizados de la spec); omite (con aviso) los
+  que no tengan calibración previa de plantilla. Fija el
   `OleDbType` de cada parámetro desde el esquema (evita "type mismatch" con los NULL). La **contraseña de la
   base NO se toca** (se abre con ella y queda igual). Uso:
   `powershell -File src\grabar_reporte.ps1 -Json <archivo> -Password "<clave>"`. Verificado contra la base

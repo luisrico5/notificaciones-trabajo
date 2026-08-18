@@ -10,12 +10,17 @@
 # - La contraseña de la base NO se toca: se abre con ella (parámetro -Password) y queda igual.
 # - IDs nuevos = MAX(CalibrationID)+1 y MAX(NoteID)+1 (no hay autonumber en estas tablas).
 # - Todo se hace dentro de una TRANSACCIÓN (o entra completo, o no entra nada).
+# - Además ACTUALIZA LA ESPECIFICACIÓN del instrumento (InstSpecGroup + INSTSPEC) con el N.º de puntos,
+#   los nominales y los rangos del reporte, porque DPCTrack ARMA el reporte desde la especificación (no
+#   desde la calibración). Sin esto, cambiar puntos/rangos en el dashboard no se reflejaba en DPCTrack.
+#   Para NO tocar la especificación (grabar solo la calibración) usa el modificador -NoSpec.
 
 [CmdletBinding()]
 param(
   [Parameter(Mandatory=$true)][string]$Json,
   [string]$Mdb      = "c:\noti\20260810_dpctrack2_editable.mdb",
-  [string]$Password = ""
+  [string]$Password = "",
+  [switch]$NoSpec
 )
 $ErrorActionPreference = "Stop"
 $Mdb  = (Resolve-Path $Mdb).Path
@@ -31,6 +36,16 @@ function New-Conn {
   throw "No se pudo abrir la base editable (revisa -Password)."
 }
 function Q($conn,$sql,$tx=$null){ $cmd=$conn.CreateCommand();$cmd.CommandText=$sql;if($tx){$cmd.Transaction=$tx};$da=New-Object System.Data.OleDb.OleDbDataAdapter $cmd;$dt=New-Object System.Data.DataTable;[void]$da.Fill($dt);return ,$dt }
+# Ejecuta un UPDATE/DELETE parametrizado. $cells = arreglo de @{ t=<OleDbType>; v=<valor> } en el orden de los "?".
+function Exec($conn,$tx,$sql,$cells){
+  $cmd=$conn.CreateCommand(); $cmd.Transaction=$tx; $cmd.CommandText=$sql
+  foreach($c in $cells){
+    $p=$cmd.CreateParameter(); $p.OleDbType=$c.t
+    if($null -eq $c.v -or $c.v -is [DBNull]){ $p.Value=[DBNull]::Value } else { $p.Value=$c.v }
+    [void]$cmd.Parameters.Add($p)
+  }
+  return $cmd.ExecuteNonQuery()
+}
 function ParseDate($s){
   if ([string]::IsNullOrWhiteSpace($s)) { return $null }
   foreach($fmt in @("dd/MM/yyyy","d/M/yyyy","dd/MM/yyyy HH:mm:ss","yyyy-MM-dd")){
@@ -78,9 +93,49 @@ function Row-Hash($schemaDt,$row,$ov){
   return $h
 }
 
+# Actualiza la ESPECIFICACIÓN del instrumento (lo que DPCTrack usa para armar el reporte) con el N.º de
+# puntos, nominales y rangos del reporte $d. Por cada grupo del JSON:
+#   1) InstSpecGroup: Divisions = N.º de puntos; Input/Output Low/High Range = mín/máx editados.
+#   2) INSTSPEC: se borran las filas de puntos viejas y se insertan N nuevas (Position, InputSignal,
+#      OutputSignal, LowLimit, HighLimit del reporte), copiando el resto de columnas de una fila plantilla
+#      del mismo grupo (COMPANYNAME, tipos de señal, precisión, resoluciones, etc.).
+# Solo actúa sobre grupos que YA existen en la spec (instrumentos reales); si falta, avisa y omite ese grupo.
+function Update-Spec($conn,$tx,$tag,$d){
+  $O=[System.Data.OleDb.OleDbType]
+  $tesc=$tag.Replace("'","''")
+  foreach($g in $d.grupos){
+    $gn=[int]$g.gn
+    $dtSpec = Q $conn "SELECT * FROM INSTSPEC WHERE INSTRUMENTCODE='$tesc' AND GroupNumber=$gn" $tx
+    if($dtSpec.Rows.Count -eq 0){ Write-Host "    (spec: sin INSTSPEC para grupo $gn de $tag; se omite la spec de ese grupo)"; continue }
+    $tpl=$dtSpec.Rows[0]
+    $pts=@($g.puntos); $ndiv=$pts.Count
+    if($ndiv -lt 1){ continue }
+    # Rangos: del JSON; si no vienen, extremos de los puntos.
+    $iLo=Dbl $g.inLow;  if($null -eq $iLo){ $iLo=Dbl $pts[0].inNom }
+    $iHi=Dbl $g.inHigh; if($null -eq $iHi){ $iHi=Dbl $pts[$ndiv-1].inNom }
+    $oLo=Dbl $g.outLow; if($null -eq $oLo){ $oLo=Dbl $pts[0].outNom }
+    $oHi=Dbl $g.outHigh;if($null -eq $oHi){ $oHi=Dbl $pts[$ndiv-1].outNom }
+    # 1) InstSpecGroup (grupo a nivel de spec): Divisions + rangos. Lo demás (precisión, IOCORRELATION…) queda igual.
+    [void](Exec $conn $tx "UPDATE InstSpecGroup SET Divisions=?, InputLowRange=?, InputHighRange=?, OutputLowRange=?, OutputHighRange=? WHERE INSTRUMENTCODE=? AND GroupNumber=?" @(
+      @{t=$O::Integer;v=$ndiv}, @{t=$O::Double;v=$iLo}, @{t=$O::Double;v=$iHi}, @{t=$O::Double;v=$oLo}, @{t=$O::Double;v=$oHi},
+      @{t=$O::VarWChar;v=$tag}, @{t=$O::Integer;v=$gn} ))
+    # 2) INSTSPEC (puntos de la spec): borrar los viejos e insertar los del reporte.
+    [void](Exec $conn $tx "DELETE FROM INSTSPEC WHERE INSTRUMENTCODE=? AND GroupNumber=?" @(
+      @{t=$O::VarWChar;v=$tag}, @{t=$O::Integer;v=$gn} ))
+    $pos=0
+    foreach($pt in $pts){
+      $pos++
+      $ov=@{ Position=$pos; InputSignal=(Dbl $pt.inNom); OutputSignal=(Dbl $pt.outNom); LowLimit=(Dbl $pt.low); HighLimit=(Dbl $pt.high) }
+      Insert-Hash $conn $tx $dtSpec "INSTSPEC" (Row-Hash $dtSpec $tpl $ov)
+    }
+    Write-Host ("    spec actualizada: grupo $gn -> $ndiv puntos, entrada $iLo..$iHi, salida $oLo..$oHi")
+  }
+}
+
 # Inserta UNA calibración (objeto $d) con IDs $cid/$note. Devuelve $true si insertó, $false si se omitió
 # (instrumento sin calibración previa que sirva de plantilla). Usa $conn/$tx abiertos.
-function Process-Cal($conn,$tx,$d,$cid,$note,$now){
+# $updateSpec: si $true, también actualiza la especificación (InstSpecGroup + INSTSPEC) del instrumento.
+function Process-Cal($conn,$tx,$d,$cid,$note,$now,$updateSpec){
   $tag = [string]$d.tag
   if ([string]::IsNullOrWhiteSpace($tag)) { Write-Host "  (omitido: calibración sin 'tag')"; return $false }
   $tplRow = (Q $conn "SELECT TOP 1 CalibrationID FROM CALIBRAT WHERE ITEMTYPE='Instrument' AND ITEMCODE='$($tag.Replace("'","''"))' ORDER BY CalibrationDate DESC, CalibrationID DESC" $tx)
@@ -183,6 +238,8 @@ function Process-Cal($conn,$tx,$d,$cid,$note,$now){
       LastCalibrationDate=(ParseDate $p[5]); NextCalibrationDate=(ParseDate $p[6]); STATUS='En servicio';
       DateEntered=$now; ENTEREDBY='User'; CountScheduleEnabled=$false; ItemCountID=0; MaxCount=0; LastReset=0; MeterValue=0; CalTestID=0 }
   }
+  # 6) Especificación (InstSpecGroup + INSTSPEC), para que DPCTrack arme el reporte con estos puntos/rangos.
+  if($updateSpec){ Update-Spec $conn $tx $tag $d }
   Write-Host ("  OK $tag -> CalibrationID=$cid, NoteID=$note (plantilla=$tpl, grupos=" + (@($d.grupos).Count) + ", patrones=" + (@($d.patrones).Count) + ")")
   return $true
 }
@@ -195,7 +252,9 @@ if ($list.Count -eq 0) { throw "El JSON no trae calibraciones." }
 $conn = New-Conn
 Write-Host "Base editable: $Mdb"
 Write-Host ("Instrumentos en el archivo: " + @($list).Count)
+Write-Host ("Especificación (InstSpecGroup+INSTSPEC): " + $(if($NoSpec){"NO se actualiza (-NoSpec)"}else{"se actualiza para reflejar puntos/rangos"}))
 $now = Get-Date
+$updateSpec = -not $NoSpec
 $nextCid  = [int]((Q $conn "SELECT MAX(CalibrationID) AS m FROM CALIBRAT").Rows[0]['m']) + 1
 $nextNote = [int]((Q $conn "SELECT MAX(NoteID) AS m FROM PCNotes").Rows[0]['m']) + 1
 
@@ -203,7 +262,7 @@ $tx = $conn.BeginTransaction()
 $ins=0; $omit=0
 try {
   foreach($cal in $list){
-    if (Process-Cal $conn $tx $cal $nextCid $nextNote $now) { $nextCid++; $nextNote++; $ins++ } else { $omit++ }
+    if (Process-Cal $conn $tx $cal $nextCid $nextNote $now $updateSpec) { $nextCid++; $nextNote++; $ins++ } else { $omit++ }
   }
   $tx.Commit()
   $conn.Close()

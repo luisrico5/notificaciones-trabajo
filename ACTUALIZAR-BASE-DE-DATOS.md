@@ -79,6 +79,11 @@ Dashboard (pestaña Reporte)                     PowerShell                     
 - **Sobrescribe solo lo nuevo**: IDs (`CalibrationID`/`NoteID` = `MAX+1`), fecha, técnico, temperatura,
   humedad, tipo, certificado, la **lectura Enc./Dejado** de cada punto (`Reading`), el resultado
   (`RESULTSTATUS`/`Failed` según los límites), los **patrones** (`CALTEST`) y la **nota** (`PCNotes`).
+- **Actualiza la ESPECIFICACIÓN del instrumento** (`InstSpecGroup` + `INSTSPEC`) con el **N.º de puntos**,
+  los **nominales** y los **rangos** (mín/máx de entrada y salida) del reporte. Esto es necesario porque
+  **DPCTrack arma el reporte desde la especificación, no desde la calibración**: sin esto, si cambiabas los
+  puntos o el rango en el dashboard, DPCTrack seguía mostrando la configuración vieja. Para grabar **solo la
+  calibración sin tocar la especificación**, añade el modificador **`-NoSpec`**.
 - Acepta **uno o varios** instrumentos (el JSON del botón trae todo el lote).
 - Todo se hace en **una sola transacción**: o entra completo, o no entra nada.
 - **La contraseña de la base NO se toca**: se abre con ella y queda igual.
@@ -95,6 +100,10 @@ Dashboard (pestaña Reporte)                     PowerShell                     
   de grabar si aplica.
 - **Deshacer una carga:** si necesitas revertir, se borran las filas insertadas por `CalibrationID`
   (y la `PCNotes` por `NoteID`) en `CALDET`, `CalGroups`, `CALTEST`, `CALIBRAT` y `PCNotes`.
+- **Cambio de especificación:** al grabar (sin `-NoSpec`), el script cambia la **spec vigente** del
+  instrumento (`InstSpecGroup` + `INSTSPEC`) para que coincida con el reporte. Es lo que hace que DPCTrack
+  muestre los puntos/rangos nuevos. Si solo quieres registrar la calibración sin alterar la spec del
+  instrumento, usa **`-NoSpec`**.
 
 ---
 
