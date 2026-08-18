@@ -255,8 +255,17 @@ Write-Host ("Instrumentos en el archivo: " + @($list).Count)
 Write-Host ("Especificación (InstSpecGroup+INSTSPEC): " + $(if($NoSpec){"NO se actualiza (-NoSpec)"}else{"se actualiza para reflejar puntos/rangos"}))
 $now = Get-Date
 $updateSpec = -not $NoSpec
-$nextCid  = [int]((Q $conn "SELECT MAX(CalibrationID) AS m FROM CALIBRAT").Rows[0]['m']) + 1
-$nextNote = [int]((Q $conn "SELECT MAX(NoteID) AS m FROM PCNotes").Rows[0]['m']) + 1
+$O = [System.Data.OleDb.OleDbType]
+
+# IDs de arranque = 1 + el MAYOR entre el MAX real de la tabla y el CONTADOR INTERNO de DPCTrack (tabla IDs,
+# columna LastID). DPCTrack asigna los IDs nuevos desde esa tabla; si solo usáramos MAX(tabla) podríamos
+# chocar con un ID que DPCTrack tenga reservado, y si no la actualizamos al final, DPCTrack reutilizará un ID
+# que ya insertamos -> "clave duplicada". Por eso leemos y luego escribimos ese contador.
+function LastId($conn,$name){ $r=Q $conn "SELECT LastID FROM IDs WHERE TABLENAME='$name'"; if($r.Rows.Count){ [int]$r.Rows[0]['LastID'] } else { 0 } }
+$maxCal  = [int]((Q $conn "SELECT MAX(CalibrationID) AS m FROM CALIBRAT").Rows[0]['m'])
+$maxNote = [int]((Q $conn "SELECT MAX(NoteID) AS m FROM PCNotes").Rows[0]['m'])
+$nextCid  = ([Math]::Max($maxCal,  (LastId $conn 'CALIBRAT'))) + 1
+$nextNote = ([Math]::Max($maxNote, (LastId $conn 'PCNOTES')))  + 1
 
 $tx = $conn.BeginTransaction()
 $ins=0; $omit=0
@@ -264,6 +273,11 @@ try {
   foreach($cal in $list){
     if (Process-Cal $conn $tx $cal $nextCid $nextNote $now $updateSpec) { $nextCid++; $nextNote++; $ins++ } else { $omit++ }
   }
+  # Mantener el contador interno de DPCTrack (tabla IDs) al día para que las próximas calibraciones que CREE
+  # DPCTrack no reutilicen los IDs que acabamos de insertar (evita el error "clave duplicada" en DPCTrack).
+  # Solo se sube (WHERE LastID<?), nunca se baja. $nextCid-1 / $nextNote-1 = último ID realmente usado.
+  [void](Exec $conn $tx "UPDATE IDs SET LastID=? WHERE TABLENAME='CALIBRAT' AND LastID<?" @(@{t=$O::Integer;v=($nextCid-1)},  @{t=$O::Integer;v=($nextCid-1)}))
+  [void](Exec $conn $tx "UPDATE IDs SET LastID=? WHERE TABLENAME='PCNOTES'  AND LastID<?" @(@{t=$O::Integer;v=($nextNote-1)}, @{t=$O::Integer;v=($nextNote-1)}))
   $tx.Commit()
   $conn.Close()
   Write-Host ("LISTO. Insertados: $ins  |  omitidos (sin plantilla): $omit")

@@ -208,9 +208,14 @@ está en medio y el archivo se regenera).
   `Position/InputSignal/OutputSignal/LowLimit/HighLimit` del reporte, copiando el resto de columnas —tipos de
   señal, precisión, resoluciones— de una fila plantilla del mismo grupo). Sin esto, cambiar puntos/rangos en
   el dashboard **no se reflejaba** en DPCTrack. El modificador **`-NoSpec`** graba solo la calibración sin
-  tocar la spec. Acepta **uno o varios** instrumentos
+  tocar la spec. **Mantiene el contador interno de DPCTrack** (tabla `IDs`, `LastID` por `TABLENAME`): los
+  IDs de arranque = `1 + max(MAX(tabla), IDs.LastID)` y al final **sube** `IDs.LastID` de `CALIBRAT` y
+  `PCNOTES` al último usado (solo hacia arriba). Sin esto, DPCTrack reutilizaba un `CalibrationID`/`NoteID`
+  ya insertado y lanzaba **"clave duplicada / violación de la llave"** al crear una calibración nueva.
+  Acepta **uno o varios** instrumentos
   (`$d.calibraciones`): itera con IDs incrementales, todo en **una transacción** (atómico; `Q` lleva la
-  transacción en cada SELECT; `Exec` corre los UPDATE/DELETE parametrizados de la spec); omite (con aviso) los
+  transacción en cada SELECT; `Exec` corre los UPDATE/DELETE parametrizados de la spec y el contador `IDs`);
+  omite (con aviso) los
   que no tengan calibración previa de plantilla. Fija el
   `OleDbType` de cada parámetro desde el esquema (evita "type mismatch" con los NULL). La **contraseña de la
   base NO se toca** (se abre con ella y queda igual). Uso:
