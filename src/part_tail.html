@@ -2898,6 +2898,9 @@ function buildRepBatch(){
     var st=repBuildState(rec);
     // Nr. de certificado = la Orden de Trabajo (OT) pegada de ese TAG (editable después).
     if(r.ot!=null && String(r.ot).trim()!=="") st.h.ce=String(r.ot).trim();
+    // Fecha "Calibrado" = fecha de la orden pegada/adjuntada de ese TAG (si es una fecha válida;
+    // si no, queda la de hoy que puso repBuildState). Editable después.
+    var fo=parseFecha(r.fecha); if(fo) st.h.dt=fo;
     seen[k]=1; REP_BATCH.push(st);
   });
 }

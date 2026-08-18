@@ -305,7 +305,7 @@
   </section>
 </div><!-- /panel-reporte -->
 
-<footer>Funciona 100% en tu navegador · Ningún dato se envía a servidores · <span title="Fecha de compilación. Si no coincide con la última, recarga con Ctrl+Shift+R.">versión 2026-08-14 21:30</span></footer>
+<footer>Funciona 100% en tu navegador · Ningún dato se envía a servidores · <span title="Fecha de compilación. Si no coincide con la última, recarga con Ctrl+Shift+R.">versión 2026-08-18 05:59</span></footer>
 </div>
 <div id="reportPrint" aria-hidden="true"></div>
 <script>
@@ -3237,6 +3237,9 @@ function buildRepBatch(){
     var st=repBuildState(rec);
     // Nr. de certificado = la Orden de Trabajo (OT) pegada de ese TAG (editable después).
     if(r.ot!=null && String(r.ot).trim()!=="") st.h.ce=String(r.ot).trim();
+    // Fecha "Calibrado" = fecha de la orden pegada/adjuntada de ese TAG (si es una fecha válida;
+    // si no, queda la de hoy que puso repBuildState). Editable después.
+    var fo=parseFecha(r.fecha); if(fo) st.h.dt=fo;
     seen[k]=1; REP_BATCH.push(st);
   });
 }
