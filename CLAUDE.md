@@ -253,10 +253,12 @@ está en medio y el archivo se regenera).
 - **Con opciones** (varias tecnologías; el técnico elige por orden en un desplegable):
   `{prefijo, nombre, proc:"", opciones:[{proc, nombre, descripcion, equipos}, …]}`.
 - **Válvula** (PV/FV/LV): igual que directa + `tipo:"valvula"` → pide *tipo de falla* (cerrada/abierta)
-  y *tecnología* (4-20/fieldbus) y añade la tabla de posición.
+  y *tecnología* (4-20/fieldbus) y añade la tabla de posición. **No** lleva la línea "Calibrado en el
+  rango de:…" (usa la tabla de posición); `genText` la omite cuando `row.isValve` (igual que con `onoff`).
 - **Combinada** (SOV/VSP): `proc:"P-SG-04586 + P-SG-04585"` con descripción unida. Llevan `onoff:true`
   (válvula on-off, sin rango/salida analógica) → `genText` **omite la línea "Calibrado en el rango de:…"**
-  (`recompAuto` fija `row.onoff` desde el mapeo; la línea solo se añade cuando `!row.onoff`).
+  (`recompAuto` fija `row.onoff` desde el mapeo; la línea solo se añade cuando `!row.onoff && !row.isValve`,
+  es decir, **ninguna válvula** —on-off ni de control— la lleva).
 - **Genérica**: `proc:""`, descripción/equipos vacíos → plantilla genérica editable.
 
 ## Convenciones / decisiones (no romper)

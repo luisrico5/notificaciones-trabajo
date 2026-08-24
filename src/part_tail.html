@@ -2324,8 +2324,9 @@ function recompAuto(row){
       var repet="Se realizaron pruebas de repetibilidad satisfactorias con el SET de:"+(row.rango?(" "+row.rango):"")+" "+SWITCH_DIR[row.key]+".";
       var reRepet=/^-[^\n]*repetit[^\n]*$/im;
       autoDesc = reRepet.test(autoDesc) ? autoDesc.replace(reRepet, "- "+repet) : (autoDesc+"\n"+repet);
-    } else if(!row.onoff){
-      // Válvulas on-off (SOV/VSP) no tienen rango/salida analógica: se omite la línea de "Calibrado en el rango".
+    } else if(!row.onoff && !row.isValve){
+      // Las válvulas —on-off (SOV/VSP) y de control (PV/FV/LV)— no tienen rango/salida analógica de
+      // calibración (llevan la tabla de posición), así que se omite la línea "Calibrado en el rango".
       autoDesc+="\n"+lineaCalib(row);
     }
     if(CALIB_ANEXA[row.key]) autoDesc+="\n"+NOTA_CALIB;
