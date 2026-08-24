@@ -305,7 +305,7 @@
   </section>
 </div><!-- /panel-reporte -->
 
-<footer>Funciona 100% en tu navegador · Ningún dato se envía a servidores · <span title="Fecha de compilación. Si no coincide con la última, recarga con Ctrl+Shift+R.">versión 2026-08-24 13:26</span></footer>
+<footer>Funciona 100% en tu navegador · Ningún dato se envía a servidores · <span title="Fecha de compilación. Si no coincide con la última, recarga con Ctrl+Shift+R.">versión 2026-08-24 13:41</span></footer>
 </div>
 <div id="reportPrint" aria-hidden="true"></div>
 <script>
@@ -771,6 +771,7 @@ var DEFAULT_MAP_ARR = [
  {
   "prefijo": "SOV",
   "nombre": "Valvula solenoide on-off",
+  "onoff": true,
   "proc": "P-SG-04586 + P-SG-04585",
   "descripcion": "Procedimientos combinados P-SG-04586 (micros de posicion) y P-SG-04585 (valvula on-off).\nTrabajo realizado (P-SG-04586):\n- Se verificó la indicación en el DCS y se abrió la caja de micros con precaución\n- Se midieron los voltajes de operación\n- Se normalizaron los actuadores mecánicos y se solicitaron pruebas de movimiento al cuarto de control\n- Se aplicó grasa en la tornillería y se cerró la caja de conexiones\n- Se confirmó la indicación correcta en campo y se entregó a producción\nTrabajo realizado (P-SG-04585):\n- Se desacopló y se bajó la válvula para su traslado al taller\n- Se desarmó el equipo retirando vástago, bola y sellos para su limpieza e inspección\n- Se realizó limpieza técnica de componentes internos y externos\n- Se armó la válvula y se ajustó con torquímetro\n- Se ejecutaron pruebas de presión en banco y se validó la operación en campo\n- Se entregó a producción\nEl equipo respondió correctamente al procedimiento; las verificaciones coincidieron con los patrones de referencia dentro de tolerancia.",
   "equipos": "Llave para tubo, llave de expansión, destornillador de pala, dado 7/16”, llave allen 7/32, multímetro digital, grasa; Llaves mixtas, llaves Allen, llave de expansión, llave de tubo, torquímetro, multímetro digital, banco de pruebas de presión"
@@ -778,6 +779,7 @@ var DEFAULT_MAP_ARR = [
  {
   "prefijo": "VSP",
   "nombre": "Valvula solenoide/posicion on-off",
+  "onoff": true,
   "proc": "P-SG-04586 + P-SG-04585",
   "descripcion": "Procedimientos combinados P-SG-04586 (micros de posicion) y P-SG-04585 (valvula on-off).\nTrabajo realizado (P-SG-04586):\n- Se verificó la indicación en el DCS y se abrió la caja de micros con precaución\n- Se midieron los voltajes de operación\n- Se normalizaron los actuadores mecánicos y se solicitaron pruebas de movimiento al cuarto de control\n- Se aplicó grasa en la tornillería y se cerró la caja de conexiones\n- Se confirmó la indicación correcta en campo y se entregó a producción\nTrabajo realizado (P-SG-04585):\n- Se desacopló y se bajó la válvula para su traslado al taller\n- Se desarmó el equipo retirando vástago, bola y sellos para su limpieza e inspección\n- Se realizó limpieza técnica de componentes internos y externos\n- Se armó la válvula y se ajustó con torquímetro\n- Se ejecutaron pruebas de presión en banco y se validó la operación en campo\n- Se entregó a producción\nEl equipo respondió correctamente al procedimiento; las verificaciones coincidieron con los patrones de referencia dentro de tolerancia.",
   "equipos": "Llave para tubo, llave de expansión, destornillador de pala, dado 7/16”, llave allen 7/32, multímetro digital, grasa; Llaves mixtas, llaves Allen, llave de expansión, llave de tubo, torquímetro, multímetro digital, banco de pruebas de presión"
@@ -862,7 +864,7 @@ function defaultMapObj(){
   return o;
 }
 
-var STORE_KEY="noti_mapping_v11";
+var STORE_KEY="noti_mapping_v12";
 var MAP={};            // prefijo -> entry
 var SORTED_KEYS=[];    // claves ordenadas por longitud desc (para match más largo)
 var rows=[];           // filas cargadas
@@ -2642,6 +2644,7 @@ function recompAuto(row){
   var src=e;
   row.hasOpts=!!(e&&e.opciones&&e.opciones.length);
   row.isValve=!!(e&&e.tipo==="valvula");
+  row.onoff=!!(e&&e.onoff);   // válvula on-off (SOV/VSP): no lleva línea de "Calibrado en el rango"
   if(row.hasOpts){
     if(typeof row.optIndex!=="number"||row.optIndex<0||row.optIndex>=e.opciones.length){ row.optIndex=-1; src=null; }
     else { src=e.opciones[row.optIndex]; }
@@ -2660,7 +2663,8 @@ function recompAuto(row){
       var repet="Se realizaron pruebas de repetibilidad satisfactorias con el SET de:"+(row.rango?(" "+row.rango):"")+" "+SWITCH_DIR[row.key]+".";
       var reRepet=/^-[^\n]*repetit[^\n]*$/im;
       autoDesc = reRepet.test(autoDesc) ? autoDesc.replace(reRepet, "- "+repet) : (autoDesc+"\n"+repet);
-    } else {
+    } else if(!row.onoff){
+      // Válvulas on-off (SOV/VSP) no tienen rango/salida analógica: se omite la línea de "Calibrado en el rango".
       autoDesc+="\n"+lineaCalib(row);
     }
     if(CALIB_ANEXA[row.key]) autoDesc+="\n"+NOTA_CALIB;

@@ -254,7 +254,9 @@ está en medio y el archivo se regenera).
   `{prefijo, nombre, proc:"", opciones:[{proc, nombre, descripcion, equipos}, …]}`.
 - **Válvula** (PV/FV/LV): igual que directa + `tipo:"valvula"` → pide *tipo de falla* (cerrada/abierta)
   y *tecnología* (4-20/fieldbus) y añade la tabla de posición.
-- **Combinada** (SOV/VSP): `proc:"P-SG-04586 + P-SG-04585"` con descripción unida.
+- **Combinada** (SOV/VSP): `proc:"P-SG-04586 + P-SG-04585"` con descripción unida. Llevan `onoff:true`
+  (válvula on-off, sin rango/salida analógica) → `genText` **omite la línea "Calibrado en el rango de:…"**
+  (`recompAuto` fija `row.onoff` desde el mapeo; la línea solo se añade cuando `!row.onoff`).
 - **Genérica**: `proc:""`, descripción/equipos vacíos → plantilla genérica editable.
 
 ## Convenciones / decisiones (no romper)
@@ -281,9 +283,10 @@ está en medio y el archivo se regenera).
   Toda la paleta/tipografía está en variables `:root` de `src/part_head.html`.
 - Nombre de archivo: `OT-TAG.txt` (TAG = primer token de la denominación).
 - Al **cambiar los datos por defecto** del mapeo, **sube la versión** `STORE_KEY` (`noti_mapping_vN`)
-  para que el `localStorage` viejo del usuario no oculte los nuevos valores. **Valor actual: `noti_mapping_v11`**
+  para que el `localStorage` viejo del usuario no oculte los nuevos valores. **Valor actual: `noti_mapping_v12`**
   (v4 PIT, v5 WT peso, v6 WT-TORQUE, v7 PSH/PSL, v8 limpieza DCS/SAP/ajuste-cero, v9 LIT,
-  v10 SHUTDOWN + TV, v11 descripciones 100% en pasado + sin menciones de reemplazo/cambio de piezas).
+  v10 SHUTDOWN + TV, v11 descripciones 100% en pasado + sin menciones de reemplazo/cambio de piezas,
+  v12 SOV/VSP marcadas `onoff` → sin línea "Calibrado en el rango").
   Otras claves de `localStorage`: `noti_calib_v1` (base de calibración adjuntada;
   el `.json` ahora es `version:2` = `{tags, reportes}`, y `reportes` alimenta la pestaña de reporte) y
   `noti_session_v1` (sesión auto-guardada).
