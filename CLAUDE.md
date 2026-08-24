@@ -258,8 +258,16 @@ está en medio y el archivo se regenera).
 - **Genérica**: `proc:""`, descripción/equipos vacíos → plantilla genérica editable.
 
 ## Convenciones / decisiones (no romper)
-- **Descripciones en pasado afirmativo**: "se hizo… el equipo respondió correctamente al procedimiento".
-  Las genera `build_config.py` transformando el imperativo (verbo→pasado + neutraliza condicionales).
+- **Descripciones 100% en pasado afirmativo**: "se hizo… el equipo respondió correctamente al procedimiento".
+  Todos los verbos van en pasado y con **concordancia** (p. ej. "se midieron los voltajes", no "se midió
+  voltajes"). **Nunca dejar un infinitivo colgando tras "y/e/coma"** (bug típico: "Se limpió el actuador **e
+  inspeccionar** conexiones" → debe ser "…**y se inspeccionaron** las conexiones"). Las descripciones baked
+  en `DEFAULT_MAP_ARR` ya están corregidas (v11); si se regeneran desde NotebookLM, revisar esto a mano.
+- **Sin cambio de piezas por defecto**: la notificación parte de un **mantenimiento preventivo sin daño**
+  (los campos automáticos ya dicen "sin daño físico", "Sin falla presentada", "Mantenimiento preventivo
+  programado"). Por eso **ninguna descripción por defecto debe afirmar que se reemplazó/cambió/sustituyó una
+  pieza** (ni "sellos nuevos", ni "reemplazar switches defectuosos", ni "sustituir el sensor"). Si en la
+  intervención real sí se cambió algo, **lo agrega el técnico a mano** editando el campo.
 - **Limpieza de bullets** (`clean_bullet` en `build_config.py`, aplica a TODAS las descripciones):
   (1) "DCS o PLC" → **DCS**; (2) **se elimina toda mención de SAP** (se quita el segmento unido por " y "
   que la contiene; si el bullet queda vacío, se descarta); (3) se **elimina el bullet completo** que diga
@@ -273,9 +281,10 @@ está en medio y el archivo se regenera).
   Toda la paleta/tipografía está en variables `:root` de `src/part_head.html`.
 - Nombre de archivo: `OT-TAG.txt` (TAG = primer token de la denominación).
 - Al **cambiar los datos por defecto** del mapeo, **sube la versión** `STORE_KEY` (`noti_mapping_vN`)
-  para que el `localStorage` viejo del usuario no oculte los nuevos valores. **Valor actual: `noti_mapping_v7`**
+  para que el `localStorage` viejo del usuario no oculte los nuevos valores. **Valor actual: `noti_mapping_v11`**
   (v4 PIT, v5 WT peso, v6 WT-TORQUE, v7 PSH/PSL, v8 limpieza DCS/SAP/ajuste-cero, v9 LIT,
-  v10 SHUTDOWN + TV). Otras claves de `localStorage`: `noti_calib_v1` (base de calibración adjuntada;
+  v10 SHUTDOWN + TV, v11 descripciones 100% en pasado + sin menciones de reemplazo/cambio de piezas).
+  Otras claves de `localStorage`: `noti_calib_v1` (base de calibración adjuntada;
   el `.json` ahora es `version:2` = `{tags, reportes}`, y `reportes` alimenta la pestaña de reporte) y
   `noti_session_v1` (sesión auto-guardada).
 - **LIT** (transmisor indicador de nivel) es **entrada propia** con las mismas opciones de nivel que LT
