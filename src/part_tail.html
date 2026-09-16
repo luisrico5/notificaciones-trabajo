@@ -531,6 +531,26 @@ var SORTED_KEYS=[];    // claves ordenadas por longitud desc (para match más la
 var rows=[];           // filas cargadas
 var uid=0;
 
+/* ---------- Cuenta de usuario (Supabase) — configuración PÚBLICA ----------
+   SB_URL y SB_ANON_KEY se copian de Supabase → Project Settings → API. La "anon key" es pública por diseño
+   (los datos los protege RLS en el servidor; ver supabase/schema.sql). NUNCA poner aquí la "service_role". */
+var SB_URL="https://TU-PROYECTO.supabase.co";
+var SB_ANON_KEY="PEGA_AQUI_LA_ANON_KEY";
+var AUTH_KEY="noti_auth_v1";       // sesión cacheada: {v,tokens:{access,refresh,expiresAt},user:{id,email},profile:{…},checked_at}
+var PENDING_KEY="noti_pending_v1"; // cola de reportes por subir (sin conexión / servidor caído)
+var CURRENT_USER=null;             // {id,email,name,role,approved} | null (lo fija auth.setUser)
+/* Nombre del usuario con sesión para los campos de técnico, en MAYÚSCULAS sin acentos (convención DPCTrack: "LUIS RICO"). */
+function tecnicoNombre(){ return (CURRENT_USER&&CURRENT_USER.name)?upNoAcc(CURRENT_USER.name):""; }
+/* Badge de estado del guardado en la nube de una fila (notificación) o de un reporte. */
+function cloudHHMM(iso){ var d=new Date(iso); if(isNaN(d.getTime())) return ""; var z=function(v){return (v<10?"0":"")+v;}; return z(d.getHours())+":"+z(d.getMinutes()); }
+function cloudBadge(o){
+  if(!o) return "";
+  if(o._cloudPending) return ' <span class="badge warn">☁ pendiente de subir</span>';
+  if(o._cloudError) return ' <span class="badge warn" title="'+escAttr(o._cloudError)+'">☁ error al guardar</span>';
+  if(o._cloudAt) return ' <span class="badge ok">☁ en mi cuenta '+esc(cloudHHMM(o._cloudAt))+'</span>';
+  return "";
+}
+
 /* ---------- Persistencia del mapeo ---------- */
 function loadMap(){
   MAP=defaultMapObj();
@@ -2231,6 +2251,7 @@ function parseISO(s){ var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s||"")); ret
 function parseDMY(s){ var f=parseFecha(s); if(!f) return null; var m=/^(\d{2})\/(\d{2})\/(\d{4})$/.exec(f); return m?new Date(+m[3],+m[2]-1,+m[1]):null; }
 function addMonths(d,n){ var x=new Date(d.getTime()); x.setMonth(x.getMonth()+n); return x; }
 function autoTecnico(row){
+  var me=tecnicoNombre(); if(me) return me;    // usuario con sesión iniciada -> su nombre (sigue editable)
   var d=rangoDe(row.tag); if(!d||!d.by) return "";
   var rep=parseISO(d.d), work=parseDMY(row.fecha);
   if(!rep||!work) return "";                 // sin fechas no se evalúa -> vacío (manual)
@@ -2476,7 +2497,7 @@ function cardHtml(r){
     '<div class="rowhead">'+
       '<div><strong>OT '+esc(r.ot||"—")+'</strong> · TAG <code>'+esc(r.tag||"—")+'</code>'+
         (r.equipo?(' · Equipo '+esc(r.equipo)):'')+(r.nombre?(' · '+esc(r.nombre)):'')+'</div>'+
-      '<div>'+badge+(r.saved?' <span class="badge ok">✓ guardada</span>':'')+'</div>'+
+      '<div>'+badge+(r.saved?' <span class="badge ok">✓ guardada</span>':'')+cloudBadge(r)+'</div>'+
     '</div>'+
     '<div class="fieldsgrid">'+
       '<label class="full">Fecha de inicio'+
@@ -2498,7 +2519,7 @@ function cardHtml(r){
       '<button class="btn" data-preview="'+r.id+'">'+(previewOpen?"Ocultar vista previa":"Vista previa")+'</button>'+
       '<button class="btn" data-copy="'+r.id+'">Copiar al portapapeles</button>'+
       '<button class="btn" data-dl="'+r.id+'">Descargar '+esc(fileNameOf(r))+'</button>'+
-      '<button class="btn primary" data-save="'+r.id+'">Guardar</button>'+
+      '<button class="btn primary" data-save="'+r.id+'">Guardar en mi cuenta</button>'+
     '</div>'+
     (previewOpen?('<div class="previewwrap"><div class="previewhd">Vista previa de '+esc(fileNameOf(r))+' (así se descargará)</div><pre class="previewbox" id="previewBox">'+esc(genText(r))+'</pre></div>'):'')+
   '</div>';
@@ -2562,7 +2583,8 @@ rowsEl.addEventListener("click", function(e){
   var cp=e.target.closest("[data-copy]");
   if(cp){ var r2=byId(cp.getAttribute("data-copy")); if(r2) copyToClipboard(genText(r2), cp); return; }
   var sv=e.target.closest("[data-save]");
-  if(sv){ var r3=byId(sv.getAttribute("data-save")); if(r3){ r3.saved=true; renderRows(); } return; }
+  if(sv){ var r3=byId(sv.getAttribute("data-save")); if(r3){ r3.saved=true; renderRows();
+    misReportes.guardarNoti(r3).then(function(){ renderRows(); }, function(e){ renderRows(); if(!e.offline) alert("No se pudo guardar en tu cuenta: "+e.message); }); } return; }
 });
 
 /* ---------- Entrada: Excel ---------- */
@@ -2781,13 +2803,14 @@ function refreshAll(){
 var SESSION_KEY="noti_session_v1";
 var _saveTimer=null;
 function saveSession(){
-  try{ localStorage.setItem(SESSION_KEY, JSON.stringify({v:1, uid:uid, currentId:currentId, rows:rows})); }catch(e){}
+  try{ localStorage.setItem(SESSION_KEY, JSON.stringify({v:1, uid:uid, currentId:currentId, rows:rows, owner:(CURRENT_USER?CURRENT_USER.id:null)})); }catch(e){}
 }
 function saveSessionSoon(){ if(_saveTimer) clearTimeout(_saveTimer); _saveTimer=setTimeout(saveSession, 600); }
 function loadSession(){
   try{
     var s=JSON.parse(localStorage.getItem(SESSION_KEY)||"null");
     if(!s || !s.rows || !s.rows.length) return false;
+    if(s.owner && CURRENT_USER && s.owner!==CURRENT_USER.id) return false;   // sesión de OTRA cuenta en este PC: no mezclar
     rows=s.rows;
     uid=s.uid || rows.reduce(function(m,r){ return Math.max(m, r.id||0); }, 0);
     currentId=(s.currentId!=null)?s.currentId:null;
@@ -2945,7 +2968,7 @@ function repBuildState(rec){
     mf:rec.mf||"", mo:rec.mo||"", sr:rec.sr||"", st:rec.st||"", cl:rec.cl||"",
     lo:rec.lo||"", bu:rec.bu||"", de:rec.de||"", eq:rec.eq||"",
     ct:rec.ct||"Programada", ce:rec.ce||"", tp:rec.tp||"", hu:rec.hu||"",
-    by:rec.by||"", fin:"User", dt:todayDMY(),
+    by:tecnicoNombre()||rec.by||"", fin:tecnicoNombre()||"User", dt:todayDMY(),
     // Nota: si el último reporte de la base trae nota (los WT traen la tabla de celdas de carga completa),
     // se usa esa; si no, se genera una por defecto con el procedimiento del mapeo. Siempre editable.
     nt: (rec.nt && String(rec.nt).trim()) ? String(rec.nt)
@@ -2974,7 +2997,8 @@ function testInstrSrc(){ return (CAL_OVERRIDE&&CAL_OVERRIDE.patrones)?CAL_OVERRI
 function tecnicoSrc(){ return (CAL_OVERRIDE&&CAL_OVERRIDE.tecnicos&&CAL_OVERRIDE.tecnicos.length)?CAL_OVERRIDE.tecnicos:TECNICOS; }
 function renderRepTecnicos(){
   var sel=document.getElementById("repTecnico"); if(!sel) return;
-  var list=tecnicoSrc()||[];
+  var list=(tecnicoSrc()||[]).slice(), _me=tecnicoNombre();
+  if(_me && !list.some(function(x){ return upNoAcc(x)===_me; })) list.unshift(_me);   // el usuario con sesión, primero
   var html='<option value="">— Selecciona técnico (aplica a todos) —</option>';
   list.forEach(function(n){ html+='<option value="'+escA(n)+'">'+esc(n)+'</option>'; });
   sel.innerHTML=html;
@@ -3068,6 +3092,7 @@ function repRenderForm(){
   f.style.display="block"; act.style.display="flex";
   repRenderStdList();
   repState.groups.forEach(function(G,gi){ G.rows.forEach(function(r,pi){ repUpdateRow(gi,pi); }); });
+  if(typeof misReportes!=="undefined") misReportes.renderRepStatus();   // estado de guardado en la nube
 }
 /* Lista de patrones del reporte (por defecto + añadidos), cada uno con opción de quitar. */
 function repRenderStdList(){
@@ -3296,12 +3321,7 @@ function repGrabar(){
 /* ---------- Wiring de la pestaña de reporte ---------- */
 (function(){
   var tabs=document.querySelectorAll(".tab");
-  tabs.forEach(function(t){ t.addEventListener("click", function(){
-    var id=t.getAttribute("data-tab");
-    tabs.forEach(function(x){ x.classList.toggle("active", x===t); });
-    document.getElementById("panel-noti").classList.toggle("active", id==="noti");
-    document.getElementById("panel-reporte").classList.toggle("active", id==="reporte");
-  }); });
+  tabs.forEach(function(t){ t.addEventListener("click", function(){ switchTab(t.getAttribute("data-tab")); }); });
   var f=document.getElementById("repForm");
   f.addEventListener("input", function(e){
     var el=e.target; if(el.tagName!=="INPUT" && el.tagName!=="TEXTAREA") return;
@@ -3378,11 +3398,503 @@ function repGrabar(){
   document.getElementById("repGrabar").addEventListener("click", repGrabar);
 })();
 
+/* ============================================================================
+   CUENTA DE USUARIO Y GUARDADO EN LA NUBE (Supabase)
+   - sb          : wrapper mínimo sobre fetch (GoTrue Auth REST + PostgREST). Sin librería externa.
+   - auth        : sesión cacheada (offline-first), gate de acceso, registro, pendiente de aprobación, logout.
+   - misReportes : serializar/guardar/listar/abrir/eliminar reportes (calibración y notificación) + cola offline.
+   - adminUsers  : aprobar/revocar/cambiar rol (solo administradores).
+   Reglas: el gate es un overlay fijo propio (#authGate) — NUNCA tocar .wrap{display}, lo usa repPdfFrom.
+   El arranque real de la app (loadSession, buildRepBatch…) se difiere a bootApp(), tras autenticar.
+   ============================================================================ */
+
+/* ---------- sb: wrapper sobre fetch ---------- */
+var sb=(function(){
+  var S={access:null, refresh:null, expiresAt:0}, _refreshing=null, _onSession=null;
+  function isOnline(){ return (typeof navigator==="undefined") || navigator.onLine!==false; }
+  function fetchFn(){ return (typeof fetch==="function")?fetch:null; }
+  function offlineErr(){ var e=new Error("Sin conexión con el servidor"); e.offline=true; return e; }
+  function humanMsg(status,code,msg){
+    var c=String(code||"").toLowerCase(), m=String(msg||"");
+    if(c==="invalid_credentials"||c==="invalid_grant"||/invalid login credentials/i.test(m)) return "Correo o contraseña incorrectos";
+    if(c==="user_already_exists"||c==="email_exists"||/already (been )?registered/i.test(m)) return "Ese correo ya está registrado";
+    if(c==="weak_password"||/password should be at least/i.test(m)) return "La contraseña es muy corta (mínimo 8 caracteres)";
+    if(c==="email_not_confirmed") return "Correo sin confirmar: pide al administrador desactivar la confirmación por correo";
+    if(c==="refresh_token_not_found"||c==="refresh_token_already_used") return "Sesión expirada, vuelve a iniciar sesión";
+    if(c==="validation_failed"||c==="email_address_invalid") return "Correo no válido";
+    if(status===429||c==="over_request_rate_limit"||c==="over_email_send_rate_limit") return "Demasiados intentos, espera un momento";
+    if(c==="42501"||status===403) return "Tu cuenta no tiene permiso (¿pendiente de aprobación?)";
+    if(c==="pgrst301"||status===401) return "Sesión expirada, vuelve a iniciar sesión";
+    if(c==="23505") return "Ya existe un reporte igual guardado";
+    if(c==="23514"||status===413) return "El reporte es demasiado grande para guardarlo";
+    if(status>=500) return "El servidor no responde (¿proyecto pausado?)";
+    return m||("Error "+status);
+  }
+  function errFrom(status,body){
+    var code=body&&(body.error_code||body.code||body.error), msg=body&&(body.msg||body.error_description||body.message);
+    var e=new Error(humanMsg(status,code,msg)); e.status=status; e.code=code; e.raw=body; return e;
+  }
+  function setSession(t){ S.access=(t&&t.access)||null; S.refresh=(t&&t.refresh)||null; S.expiresAt=(t&&t.expiresAt)||0; }
+  function applyTokens(s){
+    setSession({access:s.access_token, refresh:s.refresh_token, expiresAt:s.expires_at||(Math.floor(Date.now()/1000)+(s.expires_in||3600))});
+    if(_onSession) _onSession(S);
+  }
+  function needsRefresh(){ return !!(S.refresh && S.expiresAt && (Date.now()/1000) > (S.expiresAt-60)); }
+  function req(path,o){
+    o=o||{}; var f=fetchFn();
+    if(!f||!isOnline()) return Promise.reject(offlineErr());
+    var pre=Promise.resolve();
+    if(o.auth!==false && !o.noRetry && needsRefresh()) pre=refresh().then(null,function(){});   // refresco proactivo; si falla se intenta igual
+    return pre.then(function(){
+      var h={"apikey":SB_ANON_KEY,"Content-Type":"application/json","Accept":"application/json"};
+      if(o.auth!==false && S.access) h["Authorization"]="Bearer "+S.access;
+      if(o.prefer) h["Prefer"]=o.prefer;
+      return f(SB_URL+path,{method:o.method||"GET",headers:h,body:(o.body!=null)?JSON.stringify(o.body):undefined});
+    }).then(function(r){
+      return r.text().then(function(t){
+        var b=null; try{ b=t?JSON.parse(t):null; }catch(e){}
+        if(r.ok) return b;
+        if(r.status===401 && !o.noRetry && S.refresh){ return refresh().then(function(){ o.noRetry=true; return req(path,o); }); }
+        throw errFrom(r.status,b);
+      });
+    }, function(e){ if(e&&e.status) throw e; throw offlineErr(); });   // fallo de red (TypeError) -> offline
+  }
+  function refresh(){
+    if(_refreshing) return _refreshing;
+    try{ var c=JSON.parse(localStorage.getItem(AUTH_KEY)||"null");   // otra pestaña pudo rotar el token: releer la caché
+      if(c&&c.tokens&&c.tokens.refresh&&c.tokens.refresh!==S.refresh){ setSession(c.tokens); if(!needsRefresh()) return Promise.resolve(S); } }catch(e){}
+    if(!S.refresh) return Promise.reject(errFrom(401,{error_code:"refresh_token_not_found"}));
+    _refreshing=req("/auth/v1/token?grant_type=refresh_token",{method:"POST",auth:false,noRetry:true,body:{refresh_token:S.refresh}})
+      .then(function(s){ _refreshing=null; applyTokens(s); return s; }, function(e){ _refreshing=null; throw e; });
+    return _refreshing;
+  }
+  function qs(q){ return Object.keys(q||{}).map(function(k){ return encodeURIComponent(k)+"="+encodeURIComponent(q[k]); }).join("&"); }
+  function from(table){
+    var base="/rest/v1/"+table;
+    return {
+      select:function(cols,q){ var p={select:cols||"*"}; Object.keys(q||{}).forEach(function(k){ p[k]=q[k]; }); return req(base+"?"+qs(p)); },
+      insert:function(obj){ return req(base,{method:"POST",body:obj,prefer:"return=representation"}); },
+      upsert:function(obj,onConflict){ return req(base+"?on_conflict="+encodeURIComponent(onConflict),{method:"POST",body:obj,prefer:"resolution=merge-duplicates,return=representation"}); },
+      update:function(q,obj){ return req(base+"?"+qs(q),{method:"PATCH",body:obj,prefer:"return=representation"}); },
+      del:function(q){ return req(base+"?"+qs(q),{method:"DELETE",prefer:"return=representation"}); }
+    };
+  }
+  var authApi={
+    signUp:function(email,pass,name){ return req("/auth/v1/signup",{method:"POST",auth:false,noRetry:true,body:{email:email,password:pass,data:{full_name:name}}}).then(function(s){ if(s&&s.access_token) applyTokens(s); return s; }); },
+    signIn:function(email,pass){ return req("/auth/v1/token?grant_type=password",{method:"POST",auth:false,noRetry:true,body:{email:email,password:pass}}).then(function(s){ applyTokens(s); return s; }); },
+    refresh:refresh,
+    getUser:function(){ return req("/auth/v1/user"); },
+    signOut:function(){ return req("/auth/v1/logout",{method:"POST",noRetry:true}).then(null,function(){}); }
+  };
+  return { req:req, from:from, auth:authApi, setSession:setSession, isOnline:isOnline, errFrom:errFrom, needsRefresh:needsRefresh,
+           getSession:function(){ return {access:S.access,refresh:S.refresh,expiresAt:S.expiresAt}; }, setOnSession:function(fn){ _onSession=fn; } };
+})();
+
+/* ---------- auth: sesión, gate de acceso, registro, aprobación ---------- */
+var auth=(function(){
+  var _onReady=null, _booted=false, _offline=false;
+  function $(id){ return document.getElementById(id); }
+  function loadCache(){ try{ return JSON.parse(localStorage.getItem(AUTH_KEY)||"null"); }catch(e){ return null; } }
+  function saveCache(c){ try{ localStorage.setItem(AUTH_KEY, JSON.stringify(c)); }catch(e){} }
+  function clearCache(){ try{ localStorage.removeItem(AUTH_KEY); }catch(e){} }
+  function setUser(p){ CURRENT_USER=p?{id:p.id,email:p.email||"",name:p.full_name||"",role:p.role||"tecnico",approved:!!p.approved}:null; renderUserBar(); }
+  function isAdmin(){ return !!(CURRENT_USER&&CURRENT_USER.role==="admin"&&CURRENT_USER.approved); }
+  function canSave(){ return !!(CURRENT_USER&&CURRENT_USER.approved); }
+  function showMsg(msg,isErr){ var m=$("authMsg"); if(!m) return; m.textContent=msg||""; if(m.classList) m.classList.toggle("err",!!isErr); }
+  function viewId(view){ return "auth"+view.charAt(0).toUpperCase()+view.slice(1); }
+  function gate(view){
+    var g=$("authGate"); if(!g) return;
+    g.hidden=false; if(document.body&&document.body.classList) document.body.classList.add("gated");
+    ["authLoading","authLogin","authSignup","authPending"].forEach(function(id){ var el=$(id); if(el&&el.classList) el.classList.toggle("active", id===viewId(view)); });
+    var ub=$("userBar"); if(ub) ub.hidden=true;
+  }
+  function unlock(){
+    var g=$("authGate"); if(g) g.hidden=true;
+    if(document.body&&document.body.classList) document.body.classList.remove("gated");
+    var ub=$("userBar"); if(ub) ub.hidden=false;
+    showMsg("");
+    if(!_booted){ _booted=true; if(_onReady) _onReady(); }
+  }
+  function setOffline(off){ _offline=!!off; var b=$("ubOffline"); if(b) b.hidden=!_offline; }
+  function renderUserBar(){
+    var u=CURRENT_USER, n=$("ubName"), e=$("ubEmail"), r=$("ubRole"), ta=$("tabAdmin");
+    if(n) n.textContent=u?(u.name||u.email):"";
+    if(e) e.textContent=u?u.email:"";
+    if(r){ r.textContent=u?(u.role==="admin"?"admin":"técnico"):""; r.className="badge"+((u&&u.role==="admin")?" ok":""); }
+    if(ta) ta.hidden=!isAdmin();
+    setOffline(_offline);
+  }
+  function fetchProfile(id){ return sb.from("profiles").select("id,email,full_name,role,approved",{id:"eq."+id}).then(function(r){ if(!r||!r[0]) throw new Error("Perfil no encontrado"); return r[0]; }); }
+  function showPending(p){ var pn=$("pendName"); if(pn) pn.textContent=(p&&(p.full_name||p.email))||""; gate("pending"); }
+  function afterProfile(p,c){
+    c=c||loadCache()||{}; c.v=1; c.profile=p; c.user={id:p.id,email:p.email}; c.tokens=sb.getSession(); c.checked_at=Date.now(); saveCache(c);
+    setUser(p);
+    if(p.approved) unlock(); else showPending(p);
+  }
+  function init(onReady){
+    _onReady=onReady;
+    sb.setOnSession(function(S){ var c=loadCache()||{v:1}; c.tokens={access:S.access,refresh:S.refresh,expiresAt:S.expiresAt}; saveCache(c); });
+    var c=loadCache();
+    if(!c||!c.tokens||!c.tokens.refresh||!c.profile){
+      gate("login");
+      if(/TU-PROYECTO|PEGA_AQUI/.test(SB_URL+SB_ANON_KEY)) showMsg("Falta configurar la conexión a Supabase (SB_URL / SB_ANON_KEY en src/part_tail.html).",true);
+      return;
+    }
+    sb.setSession(c.tokens); setUser(c.profile);
+    if(c.profile.approved) unlock(); else showPending(c.profile);   // entra YA con el perfil cacheado (offline-first)
+    revalidate();                                                    // y comprueba en segundo plano
+  }
+  function revalidate(){
+    var c=loadCache(); if(!c||!c.user) return Promise.resolve();
+    if(!sb.isOnline()){ setOffline(true); return Promise.resolve(); }
+    return fetchProfile(c.user.id).then(function(p){ setOffline(false); afterProfile(p,c); })
+      .then(null,function(e){
+        if(e.offline||(e.status&&e.status>=500)){ setOffline(true); return; }       // sin red / proyecto pausado: seguir con la caché
+        if(e.status===401||e.code==="refresh_token_not_found"||e.code==="invalid_grant"||e.code==="refresh_token_already_used"){ logout(false,"Tu sesión expiró. Inicia sesión de nuevo."); return; }
+        showMsg(e.message,true);
+      });
+  }
+  function login(email,pass){
+    return sb.auth.signIn(email,pass).then(function(s){
+      var c={v:1,tokens:sb.getSession(),user:{id:s.user.id,email:s.user.email}}; saveCache(c);
+      return fetchProfile(s.user.id).then(function(p){ setOffline(false); afterProfile(p,c); });
+    });
+  }
+  function signup(name,email,pass){
+    return sb.auth.signUp(email,pass,name).then(function(s){
+      if(!s||!s.access_token||!s.user){ gate("login"); showMsg("Cuenta creada. Si el correo ya existía, inicia sesión con tu contraseña."); return; }
+      var c={v:1,tokens:sb.getSession(),user:{id:s.user.id,email:s.user.email}}; saveCache(c);
+      return fetchProfile(s.user.id).then(function(p){ afterProfile(p,c); },
+        function(){ afterProfile({id:s.user.id,email:s.user.email,full_name:name,role:"tecnico",approved:false},c); });   // perfil provisional (pendiente)
+    });
+  }
+  function logout(remote,msg){
+    if(remote) sb.auth.signOut();
+    clearCache(); CURRENT_USER=null;
+    if(msg){ try{ sessionStorage.setItem("noti_auth_msg",msg); }catch(e){} }
+    if(typeof location!=="undefined"&&location&&typeof location.reload==="function") location.reload();
+  }
+  function wire(){
+    var lg=$("btnLogin"), su=$("btnSignup");
+    function val(id){ var el=$(id); return (el&&el.value!=null)?String(el.value):""; }
+    function doLogin(){
+      var em=val("auEmail").trim(), pw=val("auPass");
+      if(!em||!pw){ showMsg("Escribe tu correo y contraseña",true); return; }
+      showMsg("Entrando…"); if(lg) lg.disabled=true;
+      login(em,pw).then(function(){ if(lg) lg.disabled=false; },
+        function(e){ if(lg) lg.disabled=false; showMsg(e.offline?"Sin conexión con el servidor. Necesitas internet para iniciar sesión.":e.message,true); });
+    }
+    if(lg) lg.addEventListener("click",doLogin);
+    var ap=$("auPass"); if(ap) ap.addEventListener("keydown",function(e){ if(e.key==="Enter") doLogin(); });
+    var ts=$("lnkToSignup"); if(ts) ts.addEventListener("click",function(){ showMsg(""); gate("signup"); });
+    var tl=$("lnkToLogin"); if(tl) tl.addEventListener("click",function(){ showMsg(""); gate("login"); });
+    if(su) su.addEventListener("click",function(){
+      var nm=val("suName").trim(), em=val("suEmail").trim(), p1=val("suPass"), p2=val("suPass2");
+      if(nm.length<3){ showMsg("Escribe tu nombre completo (así saldrá en los reportes)",true); return; }
+      if(!/^\S+@\S+\.\S+$/.test(em)){ showMsg("Correo no válido",true); return; }
+      if(p1.length<8){ showMsg("La contraseña debe tener al menos 8 caracteres",true); return; }
+      if(p1!==p2){ showMsg("Las contraseñas no coinciden",true); return; }
+      showMsg("Creando cuenta…"); su.disabled=true;
+      signup(nm,em,p1).then(function(){ su.disabled=false; },
+        function(e){ su.disabled=false; showMsg(e.offline?"Sin conexión con el servidor. Necesitas internet para registrarte.":e.message,true); });
+    });
+    var pc=$("btnPendCheck"); if(pc) pc.addEventListener("click",function(){
+      if(!sb.isOnline()){ showMsg("Sin conexión: no se puede comprobar ahora",true); return; }
+      showMsg("Comprobando…");
+      revalidate().then(function(){ if(CURRENT_USER&&!CURRENT_USER.approved) showMsg("Todavía pendiente de aprobación",true); });
+    });
+    var pl=$("btnPendLogout"); if(pl) pl.addEventListener("click",function(){ logout(true); });
+    var lo=$("btnLogout"); if(lo) lo.addEventListener("click",function(){ if(confirm("¿Cerrar sesión?")) logout(true); });
+    if(typeof window!=="undefined"&&window.addEventListener){
+      window.addEventListener("storage",function(e){ if(e.key!==AUTH_KEY) return; var c=loadCache(); if(!c){ logout(false); return; } if(c.tokens) sb.setSession(c.tokens); });
+      window.addEventListener("online",function(){ setOffline(false); revalidate(); if(typeof misReportes!=="undefined") misReportes.flushPending(); });
+      window.addEventListener("offline",function(){ setOffline(true); });
+    }
+    try{ var m=sessionStorage.getItem("noti_auth_msg"); if(m){ sessionStorage.removeItem("noti_auth_msg"); showMsg(m,true); } }catch(e){}
+  }
+  wire();
+  return { init:init, login:login, signup:signup, logout:logout, revalidate:revalidate, isAdmin:isAdmin, canSave:canSave,
+           gate:gate, unlock:unlock, showMsg:showMsg, setOffline:setOffline, renderUserBar:renderUserBar, isOffline:function(){ return _offline; } };
+})();
+
+/* ---------- Utilidades compartidas de pestañas y lote ---------- */
+/* Cambia de pestaña (noti | reporte | mis | admin); carga la lista de la pestaña al entrar. */
+function switchTab(id){
+  document.querySelectorAll(".tab").forEach(function(x){ x.classList.toggle("active", x.getAttribute("data-tab")===id); });
+  document.querySelectorAll(".tabpanel").forEach(function(p){ p.classList.toggle("active", p.id==="panel-"+id); });
+  if(id==="mis" && typeof misReportes!=="undefined") misReportes.listar();
+  if(id==="admin" && typeof adminUsers!=="undefined") adminUsers.listar();
+}
+/* Inserta o reemplaza un reporte en el lote por TAG; devuelve su índice. */
+function repBatchPut(st){
+  var k=normTag(st.rec.tag);
+  for(var i=0;i<REP_BATCH.length;i++){ if(normTag(REP_BATCH[i].rec.tag)===k){ REP_BATCH[i]=st; return i; } }
+  REP_BATCH.push(st); return REP_BATCH.length-1;
+}
+
+/* ---------- misReportes: serialización, guardado con cola, listado, abrir, descargar, eliminar ---------- */
+var misReportes=(function(){
+  function $(id){ return document.getElementById(id); }
+  function n(v){ return (v==null)?NaN:pnum(v); }
+  function fmtDT(iso){ var d=new Date(iso); if(isNaN(d.getTime())) return iso||""; var z=function(v){return (v<10?"0":"")+v;}; return z(d.getDate())+"/"+z(d.getMonth()+1)+"/"+d.getFullYear()+" "+z(d.getHours())+":"+z(d.getMinutes()); }
+  // ---- cola de pendientes (localStorage) ----
+  function loadQ(){ try{ return JSON.parse(localStorage.getItem(PENDING_KEY)||"[]")||[]; }catch(e){ return []; } }
+  function saveQ(q){ try{ localStorage.setItem(PENDING_KEY, JSON.stringify(q)); }catch(e){} updatePendBadge(q); }
+  function myQ(q){ q=q||loadQ(); var me=CURRENT_USER?CURRENT_USER.id:null; return q.filter(function(x){ return x.user_id===me; }); }
+  function updatePendBadge(q){ var b=$("ubPend"); if(!b) return; var k=myQ(q).length; b.hidden=!k; b.textContent=k+" por subir"; }
+  function findObj(qid){ for(var i=0;i<rows.length;i++){ if(rows[i]._qid===qid) return rows[i]; } for(var j=0;j<REP_BATCH.length;j++){ if(REP_BATCH[j]._qid===qid) return REP_BATCH[j]; } return null; }
+  // ---- serialización de un reporte de calibración ----
+  // Se guarda rec COMPLETO (snapshot de la base) + h + std + rows/range por grupo. NO se guardan meta (=rec.g[i]) ni tol (función):
+  // al reabrir, repBuildState(rec) los reconstruye igual (tol=deriveTol(pts)) y encima se aplican h/std/rows/range guardados.
+  function serializeCal(st){
+    if(typeof repFlushEdits==="function" && st===repState) repFlushEdits();
+    return { v:1, tag:st.rec.tag, rec:st.rec, h:st.h, std:st.std||[],
+      groups:(st.groups||[]).map(function(G){ return { gn:(G.meta?G.meta.gn:null), range:G.range, rows:G.rows }; }) };
+  }
+  function deserializeCal(p){
+    var st=repBuildState(p.rec);
+    Object.keys(p.h||{}).forEach(function(k){ st.h[k]=p.h[k]; });
+    st.std=(p.std||[]).map(function(x){ return x.slice(); });
+    (p.groups||[]).forEach(function(sg,i){
+      var G=st.groups[i]; if(!G) return;
+      if(sg.range) G.range={iLo:n(sg.range.iLo),iHi:n(sg.range.iHi),oLo:n(sg.range.oLo),oHi:n(sg.range.oHi)};
+      if(sg.rows) G.rows=sg.rows.map(function(r){ return {inNom:n(r.inNom),outNom:n(r.outNom),lo:n(r.lo),hi:n(r.hi),found:n(r.found),left:n(r.left)}; });
+    });
+    return st;
+  }
+  // ---- serialización de una notificación (la fila completa + el .txt tal cual) ----
+  var PRIV=["_cloudId","_cloudAt","_cloudPending","_cloudError","_qid"];
+  function stripPriv(o){ var c=JSON.parse(JSON.stringify(o)); PRIV.forEach(function(k){ delete c[k]; }); return c; }
+  function serializeNoti(row){ return { v:1, row:stripPriv(row), txt:genText(row), filename:fileNameOf(row) }; }
+  function deserializeNoti(p){ var r=JSON.parse(JSON.stringify(p.row)); r.id=++uid; r.saved=true; recompAuto(r); return r; }
+  // ---- filas para la tabla reportes ----
+  function itemCal(st){ return { kind:"calibracion", tag:st.rec.tag||"", ot:String(st.h.ce||"").trim(), titulo:((st.rec.n||"")+" · "+(st.h.dt||"")).trim(), payload:serializeCal(st) }; }
+  function itemNoti(row){ return { kind:"notificacion", tag:row.tag||"", ot:String(row.ot||"").trim(), titulo:((row.nombre||sinTipoOrden(row.denom||""))+(row.fecha?(" · "+row.fecha):"")).trim(), payload:serializeNoti(row) }; }
+  // ---- guardar ----
+  function enqueue(item,obj){
+    var q=loadQ(), qid=obj._qid||("q"+Date.now()+"_"+Math.floor(Math.random()*1e6)), ex=-1;
+    q.forEach(function(x,i){ if(x.qid===qid) ex=i; });
+    var rec={qid:qid,user_id:(CURRENT_USER?CURRENT_USER.id:null),kind:item.kind,tag:item.tag,ot:item.ot,titulo:item.titulo,payload:item.payload,cloud_id:obj._cloudId||null,queued_at:new Date().toISOString(),tries:(ex>=0?(q[ex].tries||0):0),lastError:""};
+    if(ex>=0) q[ex]=rec; else q.push(rec);
+    obj._qid=qid; obj._cloudPending=true; obj._cloudError=""; saveQ(q);
+  }
+  function dequeue(qid){ if(!qid) return; saveQ(loadQ().filter(function(x){ return x.qid!==qid; })); }
+  function push(item,cloudId){
+    var t=sb.from("reportes");
+    if(cloudId) return t.update({id:"eq."+cloudId},item).then(function(r){ if(r&&r.length) return r; return t.upsert(item,"user_id,kind,tag,ot"); });   // 0 filas = lo borraron -> crear
+    return t.upsert(item,"user_id,kind,tag,ot");   // mismo usuario+tipo+TAG+OT -> actualiza en vez de duplicar
+  }
+  function guardar(item,obj){
+    if(!auth.canSave()){ var e0=new Error("Tu cuenta está pendiente de aprobación; todavía no puedes guardar en tu cuenta"); e0.status=403; return Promise.reject(e0); }
+    return push(item,obj._cloudId).then(function(r){
+      var x=r&&r[0]; if(x){ obj._cloudId=x.id; obj._cloudAt=x.updated_at||new Date().toISOString(); }
+      obj._cloudPending=false; obj._cloudError=""; if(obj._qid){ dequeue(obj._qid); obj._qid=null; }
+      return x;
+    }, function(e){
+      if(e.offline||(e.status&&e.status>=500)) enqueue(item,obj); else { obj._cloudPending=false; obj._cloudError=e.message; }
+      throw e;
+    });
+  }
+  function resumen(pref,ok,pend,err){ return pref+ok+(pend?(" · pendientes de subir (sin conexión): "+pend):"")+(err.length?("\nErrores: "+err.join("; ")):""); }
+  function guardarCal(st){
+    if(!st){ alert("Elige un instrumento en la lista o busca un TAG."); return Promise.resolve(); }
+    return guardar(itemCal(st),st).then(function(){ renderRepStatus(); }, function(e){ renderRepStatus(); if(!e.offline) alert("No se pudo guardar en tu cuenta: "+e.message); });
+  }
+  function guardarCalTodos(){
+    if(!REP_BATCH.length){ alert("No hay reportes cargados."); return Promise.resolve(); }
+    var ok=0,pend=0,err=[],i=0;
+    function next(){
+      if(i>=REP_BATCH.length){ renderRepStatus(); alert(resumen("Reportes guardados en tu cuenta: ",ok,pend,err)); return Promise.resolve(); }
+      var st=REP_BATCH[i++];
+      return guardar(itemCal(st),st).then(function(){ ok++; return next(); }, function(e){ if(e.offline||(e.status&&e.status>=500)) pend++; else err.push(st.rec.tag+": "+e.message); return next(); });
+    }
+    return next();
+  }
+  function guardarNoti(row){ return guardar(itemNoti(row),row); }
+  function guardarNotiTodas(){
+    if(!rows.length){ alert("No hay órdenes cargadas."); return Promise.resolve(); }
+    var ok=0,pend=0,err=[],i=0;
+    function next(){
+      if(i>=rows.length){ renderRows(); alert(resumen("Notificaciones guardadas en tu cuenta: ",ok,pend,err)); return Promise.resolve(); }
+      var r=rows[i++]; r.saved=true;
+      return guardar(itemNoti(r),r).then(function(){ ok++; return next(); }, function(e){ if(e.offline||(e.status&&e.status>=500)) pend++; else err.push((r.ot||r.tag||"?")+": "+e.message); return next(); });
+    }
+    return next();
+  }
+  // ---- cola: reintentar lo pendiente ----
+  var _flushing=false;
+  function flushPending(){
+    if(_flushing||!CURRENT_USER||!auth.canSave()||!sb.isOnline()) return Promise.resolve();
+    var q=myQ(); if(!q.length){ renderPend(); return Promise.resolve(); }
+    _flushing=true; var i=0;
+    function done(){ _flushing=false; renderPend(); renderRows(); renderRepStatus(); return Promise.resolve(); }
+    function next(){
+      if(i>=q.length) return done();
+      var it=q[i++], item={kind:it.kind,tag:it.tag,ot:it.ot,titulo:it.titulo,payload:it.payload};
+      return push(item,it.cloud_id).then(function(r){
+        var x=r&&r[0]; dequeue(it.qid);
+        var obj=findObj(it.qid); if(obj){ obj._qid=null; obj._cloudPending=false; obj._cloudError=""; if(x){ obj._cloudId=x.id; obj._cloudAt=x.updated_at; } }
+        return next();
+      }, function(e){
+        var all=loadQ(); all.forEach(function(x){ if(x.qid===it.qid){ x.tries=(x.tries||0)+1; x.lastError=e.message||""; } }); saveQ(all);
+        if(e.offline||(e.status&&e.status>=500)) return done();   // sin red: parar; se reintenta al volver la conexión
+        return next();
+      });
+    }
+    return next();
+  }
+  function renderPend(){
+    var el=$("misPend"); if(!el) return; var q=myQ();
+    if(!q.length){ el.hidden=true; el.innerHTML=""; return; }
+    el.hidden=false;
+    el.innerHTML='<div class="hint" style="margin:0 0 8px"><b>'+q.length+' pendiente(s) de subir</b> (se reintenta al volver la conexión). <button class="lnk" data-qretry="1">Reintentar ahora</button></div>'+
+      '<div class="tbl-wrap" style="margin-bottom:12px"><table class="map"><thead><tr><th>Tipo</th><th>TAG</th><th>OT</th><th>Título</th><th>Último error</th><th></th></tr></thead><tbody>'+
+      q.map(function(x){ return '<tr><td>'+esc(x.kind)+'</td><td><code>'+esc(x.tag)+'</code></td><td>'+esc(x.ot)+'</td><td>'+esc(x.titulo)+'</td><td>'+esc(x.lastError||"")+'</td><td class="actions"><button class="lnk del" data-qdrop="'+escA(x.qid)+'">Descartar</button></td></tr>'; }).join("")+
+      '</tbody></table></div>';
+  }
+  // ---- listar / abrir / descargar / eliminar ----
+  function listar(){
+    renderPend();
+    var msg=$("misMsg"), list=$("misList"), cnt=$("misCount"); if(!list) return Promise.resolve();
+    var q={order:"updated_at.desc",limit:200};
+    var ke=$("misKind"), kind=(ke&&ke.value)||""; if(kind) q.kind="eq."+kind;
+    var us=$("misUser"); if(us){ us.hidden=!auth.isAdmin(); if(auth.isAdmin()&&us.value) q.user_id="eq."+us.value; }
+    if(!sb.isOnline()){ if(msg) msg.textContent="Sin conexión: no se puede consultar lo guardado en tu cuenta."; list.innerHTML=""; return Promise.resolve(); }
+    if(msg) msg.textContent="Cargando…";
+    return sb.from("reportes").select("id,user_id,kind,tag,ot,titulo,created_at,updated_at,profiles(full_name)",q).then(function(items){
+      items=items||[]; var adm=auth.isAdmin();
+      if(msg) msg.textContent=items.length?"":"Todavía no hay nada guardado en tu cuenta.";
+      if(cnt) cnt.textContent=items.length?(items.length+" guardado(s)"):"";
+      list.innerHTML='<table class="map"><thead><tr><th>Tipo</th><th>TAG</th><th>OT</th><th>Título</th>'+(adm?'<th>Usuario</th>':'')+'<th>Actualizado</th><th></th></tr></thead><tbody>'+
+        items.map(function(x){ var isCal=(x.kind==="calibracion");
+          return '<tr><td><span class="badge '+(isCal?"info":"ok")+'">'+(isCal?"Calibración":"Notificación")+'</span></td><td><code>'+esc(x.tag)+'</code></td><td>'+esc(x.ot)+'</td><td>'+esc(x.titulo)+'</td>'+
+            (adm?('<td>'+esc((x.profiles&&x.profiles.full_name)||"")+'</td>'):'')+'<td>'+esc(fmtDT(x.updated_at))+'</td>'+
+            '<td class="actions"><button class="lnk" data-open="'+escA(x.id)+'">Abrir</button> '+
+            (isCal?('<button class="lnk" data-dlpdf="'+escA(x.id)+'">PDF</button> <button class="lnk" data-dljson="'+escA(x.id)+'">JSON</button> '):('<button class="lnk" data-dltxt="'+escA(x.id)+'">.txt</button> '))+
+            '<button class="lnk del" data-del="'+escA(x.id)+'">Eliminar</button></td></tr>'; }).join("")+'</tbody></table>';
+    }, function(e){ if(msg) msg.textContent="No se pudo cargar la lista: "+e.message; list.innerHTML=""; });
+  }
+  function fetchOne(id){ return sb.from("reportes").select("*",{id:"eq."+id}).then(function(r){ if(!r||!r[0]) throw new Error("No se encontró el reporte (¿lo eliminaron?)"); return r[0]; }); }
+  function abrir(id){
+    return fetchOne(id).then(function(x){
+      if(x.kind==="calibracion"){
+        var st=deserializeCal(x.payload); st._cloudId=x.id; st._cloudAt=x.updated_at;
+        var k=normTag(st.rec.tag), had=REP_BATCH.some(function(s){ return normTag(s.rec.tag)===k; });
+        if(had && !confirm("Ya hay un reporte de "+st.rec.tag+" cargado. ¿Reemplazarlo por el guardado en tu cuenta?")) return;
+        var idx=repBatchPut(st); renderRepSelect(); var sel=$("repSelect"); if(sel) sel.value=String(idx); repSelectShow(idx); switchTab("reporte");
+      } else {
+        var r=deserializeNoti(x.payload); r._cloudId=x.id; r._cloudAt=x.updated_at;
+        var kk=normTag(r.tag||""), i=-1; rows.forEach(function(rr,ii){ if(String(rr.ot||"")===String(r.ot||"") && normTag(rr.tag||"")===kk) i=ii; });
+        if(i>=0){ if(!confirm("Ya hay una orden "+(r.ot||"")+" ("+(r.tag||"")+") cargada. ¿Reemplazarla por la guardada en tu cuenta?")) return; rows[i]=r; } else rows.push(r);
+        currentId=r.id; renderRows(); switchTab("noti");
+      }
+    }, function(e){ alert(e.message); });
+  }
+  function dlPdf(id){ return fetchOne(id).then(function(x){ var st=deserializeCal(x.payload); return repPdfFrom(st,(st.rec.tag||"reporte")+".pdf"); }, function(e){ alert(e.message); }); }
+  function dlJson(id){ return fetchOne(id).then(function(x){ var st=deserializeCal(x.payload), fn="grabar_"+(st.rec.tag||"reporte")+"_"+todayDMY().replace(/\//g,"")+".json";
+    downloadText(fn, JSON.stringify({version:1,generado:todayDMY(),calibraciones:[repGrabarPayload(st)]},null,1)); }, function(e){ alert(e.message); }); }
+  function dlTxt(id){ return fetchOne(id).then(function(x){ var p=x.payload||{}; downloadText(p.filename||((x.ot||"orden")+"-"+(x.tag||"tag")+".txt"), p.txt||""); }, function(e){ alert(e.message); }); }
+  function eliminar(id){
+    if(!confirm("¿Eliminar este reporte de la cuenta? No se puede deshacer.")) return Promise.resolve();
+    return sb.from("reportes").del({id:"eq."+id}).then(function(r){
+      if(!r||!r.length) alert("No se eliminó (¿ya no existe o no tienes permiso?)");
+      rows.forEach(function(x){ if(x._cloudId===id){ x._cloudId=null; x._cloudAt=null; } });
+      REP_BATCH.forEach(function(s){ if(s._cloudId===id){ s._cloudId=null; s._cloudAt=null; } });
+      return listar();
+    }, function(e){ alert("No se pudo eliminar: "+e.message); });
+  }
+  function renderRepStatus(){
+    var el=$("repNubeMsg"); if(!el) return; var st=repState;
+    if(!st) el.textContent="";
+    else if(st._cloudPending) el.textContent="☁ pendiente de subir (sin conexión)";
+    else if(st._cloudError) el.textContent="☁ error al guardar: "+st._cloudError;
+    else if(st._cloudAt) el.textContent="☁ guardado en tu cuenta "+fmtDT(st._cloudAt);
+    else el.textContent="";
+  }
+  function wire(){
+    var ml=$("misList"); if(ml) ml.addEventListener("click",function(e){
+      var t=(e.target&&e.target.closest)?e.target.closest("[data-open],[data-dlpdf],[data-dljson],[data-dltxt],[data-del]"):null; if(!t) return;
+      var id;
+      if((id=t.getAttribute("data-open"))) abrir(id);
+      else if((id=t.getAttribute("data-dlpdf"))) dlPdf(id);
+      else if((id=t.getAttribute("data-dljson"))) dlJson(id);
+      else if((id=t.getAttribute("data-dltxt"))) dlTxt(id);
+      else if((id=t.getAttribute("data-del"))) eliminar(id);
+    });
+    var mp=$("misPend"); if(mp) mp.addEventListener("click",function(e){
+      var t=e.target; if(!t||!t.getAttribute) return;
+      if(t.hasAttribute("data-qretry")){ flushPending(); return; }
+      var qd=t.getAttribute("data-qdrop");
+      if(qd && confirm("¿Descartar este pendiente? Se perderá lo que no se subió.")){ var obj=findObj(qd); if(obj){ obj._qid=null; obj._cloudPending=false; } dequeue(qd); renderPend(); renderRows(); renderRepStatus(); }
+    });
+    ["misKind","misUser"].forEach(function(id){ var s=$(id); if(s) s.addEventListener("change",function(){ listar(); }); });
+    var mr=$("misRefresh"); if(mr) mr.addEventListener("click",function(){ listar(); });
+    var bn=$("btnNubeTodas"); if(bn) bn.addEventListener("click",function(){ guardarNotiTodas(); });
+    var g1=$("repGuardarNube"); if(g1) g1.addEventListener("click",function(){ guardarCal(repState); });
+    var g2=$("repGuardarNubeTodos"); if(g2) g2.addEventListener("click",function(){ guardarCalTodos(); });
+  }
+  wire();
+  return { serializeCal:serializeCal, deserializeCal:deserializeCal, serializeNoti:serializeNoti, deserializeNoti:deserializeNoti,
+           itemCal:itemCal, itemNoti:itemNoti, guardar:guardar, guardarCal:guardarCal, guardarCalTodos:guardarCalTodos, guardarNoti:guardarNoti, guardarNotiTodas:guardarNotiTodas,
+           flushPending:flushPending, listar:listar, abrir:abrir, eliminar:eliminar, renderRepStatus:renderRepStatus, renderPend:renderPend,
+           updatePendBadge:function(){ updatePendBadge(loadQ()); }, pendientes:function(){ return myQ(); } };
+})();
+
+/* ---------- adminUsers: aprobar / revocar / rol (solo administradores) ---------- */
+var adminUsers=(function(){
+  function $(id){ return document.getElementById(id); }
+  function fmtD(iso){ var d=new Date(iso); if(isNaN(d.getTime())) return ""; var z=function(v){return (v<10?"0":"")+v;}; return z(d.getDate())+"/"+z(d.getMonth()+1)+"/"+d.getFullYear(); }
+  function listar(){
+    if(!auth.isAdmin()) return Promise.resolve();
+    var msg=$("admMsg"), list=$("admList"), cnt=$("admCount"), tab=$("tabAdmin");
+    if(!sb.isOnline()){ if(msg) msg.textContent="Sin conexión: no se puede consultar la lista de usuarios."; return Promise.resolve(); }
+    if(msg) msg.textContent="Cargando…";
+    return sb.from("profiles").select("id,email,full_name,role,approved,created_at",{order:"created_at.desc"}).then(function(users){
+      users=users||[]; var pend=users.filter(function(u){ return !u.approved; }).length, me=CURRENT_USER?CURRENT_USER.id:null;
+      if(msg) msg.textContent=""; if(cnt) cnt.textContent=users.length+" usuario(s)"+(pend?(" · "+pend+" pendiente(s)"):"");
+      if(tab) tab.textContent="Usuarios"+(pend?(" ("+pend+" pendientes)"):"");
+      if(list) list.innerHTML='<table class="map"><thead><tr><th>Nombre</th><th>Correo</th><th>Estado</th><th>Rol</th><th>Registrado</th><th></th></tr></thead><tbody>'+
+        users.map(function(u){ var self=(u.id===me);
+          return '<tr><td><strong>'+esc(u.full_name||"")+'</strong></td><td>'+esc(u.email||"")+'</td>'+
+            '<td><span class="badge '+(u.approved?"ok":"warn")+'">'+(u.approved?"Aprobado":"Pendiente")+'</span></td>'+
+            '<td><span class="badge'+(u.role==="admin"?" info":"")+'">'+esc(u.role||"")+'</span></td><td>'+esc(fmtD(u.created_at))+'</td>'+
+            '<td class="actions">'+(self?'<span class="hint" style="margin:0">(tú)</span>':(
+              (u.approved?('<button class="lnk del" data-revoke="'+escA(u.id)+'">Revocar</button> '):('<button class="lnk" data-approve="'+escA(u.id)+'">Aprobar</button> '))+
+              (u.role==="admin"?('<button class="lnk" data-role="tecnico" data-uid="'+escA(u.id)+'">Quitar admin</button>'):('<button class="lnk" data-role="admin" data-uid="'+escA(u.id)+'">Hacer admin</button>'))))+
+            '</td></tr>'; }).join("")+'</tbody></table>';
+      var mu=$("misUser"); if(mu){ var cur=mu.value; mu.innerHTML='<option value="">Todos los usuarios</option>'+users.map(function(u){ return '<option value="'+escA(u.id)+'">'+esc(u.full_name||u.email)+'</option>'; }).join(""); mu.value=cur; }
+    }, function(e){ if(msg) msg.textContent="No se pudo cargar: "+e.message; });
+  }
+  function setApproved(id,val){ return sb.from("profiles").update({id:"eq."+id},{approved:!!val}).then(function(r){ if(!r||!r.length) alert("No se pudo cambiar (¿sin permiso?)"); return listar(); }, function(e){ alert("Error: "+e.message); }); }
+  function setRol(id,rol){ return sb.from("profiles").update({id:"eq."+id},{role:rol}).then(function(r){ if(!r||!r.length) alert("No se pudo cambiar (¿sin permiso?)"); return listar(); }, function(e){ alert("Error: "+e.message); }); }
+  function wire(){
+    var l=$("admList"); if(l) l.addEventListener("click",function(e){
+      var t=(e.target&&e.target.closest)?e.target.closest("[data-approve],[data-revoke],[data-role]"):null; if(!t) return;
+      var id;
+      if((id=t.getAttribute("data-approve"))) setApproved(id,true);
+      else if((id=t.getAttribute("data-revoke"))){ if(confirm("¿Revocar la aprobación? El usuario no podrá guardar en su cuenta.")) setApproved(id,false); }
+      else if(t.getAttribute("data-role")){ var u=t.getAttribute("data-uid"), rol=t.getAttribute("data-role"); if(confirm("¿Cambiar el rol a "+rol+"?")) setRol(u,rol); }
+    });
+    var r=$("admRefresh"); if(r) r.addEventListener("click",function(){ listar(); });
+  }
+  wire();
+  return { listar:listar, setApproved:setApproved, setRol:setRol };
+})();
+
 /* ---------- Init ---------- */
 loadMap();
 renderMap();
 renderCalStatus();
-if(loadSession()){ renderRows(); buildRepBatch(); renderRepSelect(); }   // retoma sesión + reportes
+var _appBooted=false;
+function bootApp(){                            // UNA vez, tras autenticar y estar aprobado (auth.init -> unlock)
+  if(_appBooted) return; _appBooted=true;
+  renderRepTecnicos();                         // ahora incluye al usuario con sesión
+  if(loadSession()){ renderRows(); buildRepBatch(); renderRepSelect(); }   // retoma sesión + reportes (recompAuto/repBuildState ya ven CURRENT_USER)
+  misReportes.updatePendBadge();
+  misReportes.flushPending();
+  if(auth.isAdmin()) adminUsers.listar();
+}
+auth.init(bootApp);
 </script>
 </body>
 </html>

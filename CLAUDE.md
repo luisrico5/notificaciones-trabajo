@@ -4,13 +4,18 @@ Guía para trabajar en este proyecto. Lee también `README.md` (uso) y la memori
 (El título visible de la app es **"Notificaciones de Trabajo"**, sin la palabra "Dashboard".)
 
 ## Qué es
-App web de **un solo archivo** (`index.html`) que corre 100% en el navegador (sin servidor, offline).
+App web de **un solo archivo** (`index.html`) que corre en el navegador. Requiere **iniciar sesión**
+(Supabase: usuarios **aprobados por un administrador**) y **guarda los reportes por usuario** en la nube;
+sin internet sigue generando .txt/PDF con la sesión cacheada, pero guardar/listar requiere red (ver
+*Auth y guardado por usuario*).
 A partir de una tabla de Órdenes de Trabajo (columna **OT** + **denominación de objeto técnico** = TAG),
 asocia cada TAG a su **procedimiento P-SG-…** y genera una **plantilla de notificación `.txt`** por orden.
-Entrada por Excel o por pegado. Sin dependencias externas en runtime. Dos pestañas arriba:
+Entrada por Excel o por pegado. Única dependencia de red: la API REST de Supabase (sin librería; wrapper
+`sb` sobre `fetch`). Cuatro pestañas arriba:
 **Notificaciones** (UI en tres tarjetas: **01 Cargar datos** y **02 Mapeo** lado a lado con `.toprow`, y
-**03 Notificaciones** a ancho completo debajo) y **Reporte de calibración** (generador del informe DPCTrack
-en PDF a partir de un TAG; ver sección de arquitectura).
+**03 Notificaciones** a ancho completo debajo), **Reporte de calibración** (generador del informe DPCTrack
+en PDF a partir de un TAG; ver sección de arquitectura), **Mis reportes** (lo guardado en la cuenta) y
+**Usuarios** (solo admin: aprobar/revocar). Toda la app queda tras un **gate de login** (ver *Auth*).
 
 ## Estructura de archivos
 ```
@@ -38,6 +43,8 @@ src/
                          reporte desde la spec, no desde la calibración (usa -NoSpec para no tocar la spec).
                          Nunca toca la contraseña ni la base _backup.
 datos_calibracion.json <- Datos de calibración portables (para adjuntar en la app). Generado.
+supabase/schema.sql   <- Esquema Supabase (profiles, reportes, trigger handle_new_user, helpers is_admin/
+                         is_approved, RLS). Sin secretos; se pega en el SQL Editor del proyecto.
 .gitignore            <- Excluye *.mdb y zzz/ (no publicar base ni binarios).
 20260810_dpctrack2_backup.mdb    <- Base DPCTrack2 (Jet 4, clave en zzz\PasswordReset.exe). SOLO CONSULTA (ver regla). NO PUBLICAR.
 20260810_dpctrack2_editable.mdb  <- Copia de trabajo de la base (aquí SÍ se puede modificar). NO PUBLICAR.
@@ -248,6 +255,61 @@ está en medio y el archivo se regenera).
   completo, **03 Notificaciones** (`#resultsCard`) que solo aparece al cargar datos y muestra una plantilla
   únicamente cuando se elige una orden del desplegable. En pantallas < 820px la fila superior se apila.
 
+## Auth y guardado por usuario (Supabase)
+Bloque al final de `src/part_tail.html` (entre el IIFE de wiring y el Init). Config pública tras `var uid=0;`:
+`SB_URL`, `SB_ANON_KEY` (la anon key es pública; la protege RLS; **la `service_role` NUNCA va en cliente ni
+repo**), `AUTH_KEY="noti_auth_v1"`, `PENDING_KEY="noti_pending_v1"`, `CURRENT_USER` y `tecnicoNombre()`
+(= `upNoAcc(nombre)`: "Luis Rico"→"LUIS RICO", convención DPCTrack). Esquema en `supabase/schema.sql`
+(pasos de configuración en el README, "Configurar Supabase").
+- **`sb`** (wrapper sobre `fetch`; NO se vendoriza supabase-js): `req` (headers `apikey` / `Authorization:
+  Bearer` / `Prefer`; sin `fetch` o `navigator.onLine===false` → `e.offline`; TypeError de red → `e.offline`;
+  **refresco proactivo** si el JWT vence en <60 s; **401 → `refresh()` single-flight → 1 reintento**;
+  `errFrom` → mensajes en español para GoTrue nuevo/antiguo y PostgREST), `from(t).select/insert/upsert/
+  update/del` (filtros PostgREST `{id:"eq.x", order:"updated_at.desc", limit:200}`),
+  `auth.signUp/signIn/refresh/getUser/signOut`.
+- **`auth`**: caché `noti_auth_v1={v,tokens:{access,refresh,expiresAt},user:{id,email},profile:{…},checked_at}`.
+  `init(onReady)`: sin caché → `gate("login")` (+aviso si `SB_URL` sigue en placeholder); con caché → entra
+  YA (offline-first): aprobado → `unlock()`→`onReady()` (=`bootApp`, una sola vez), pendiente →
+  `gate("pending")`; luego `revalidate()` en segundo plano (offline/5xx → badge "sin conexión"; 401 /
+  `invalid_grant` / `refresh_token_not_found` → borra caché y `location.reload()` con aviso; `approved`
+  cambiado → aplica). `logout()` = borrar caché + `location.reload()`. Eventos `storage` (sincroniza
+  pestañas), `online`/`offline`. **El gate es el overlay `#authGate`** (`position:fixed`, fuera de `.wrap`,
+  visible por defecto): **NUNCA tocar `.wrap{display}`** (lo usa `repPdfFrom`). La regla
+  `[hidden]{display:none!important}` es necesaria (los bloques nuevos usan flex).
+- **Init diferido**: `loadMap/renderMap/renderCalStatus` corren siempre; `bootApp()` (tras autenticar) hace
+  `renderRepTecnicos` (incluye al usuario), `loadSession`/`renderRows`/`buildRepBatch`/`renderRepSelect`,
+  `misReportes.flushPending()` y, si admin, `adminUsers.listar()`.
+- **Atribución**: `autoTecnico` devuelve `tecnicoNombre()` si hay sesión (si no, la regla de 2 meses);
+  `repBuildState` pone `h.by=tecnicoNombre()||rec.by` y `h.fin=tecnicoNombre()||"User"`;
+  `renderRepTecnicos` antepone al usuario si no está en `TECNICOS`. Todo sigue editable (`aplicaTecnico`
+  respeta `_autoTec`).
+- **`misReportes`**: `serializeCal(st)` = `{v:1,tag,rec (snapshot COMPLETO),h,std,groups:[{gn,range,rows}]}`
+  — sin `meta` (=`rec.g[i]`) ni `tol` (función); `deserializeCal(p)` = `repBuildState(p.rec)` (re-deriva `tol`
+  con `deriveTol(pts)`) + sobreescribir `h/std/range/rows` (`null`→`NaN`). Así `repGrabarPayload` y
+  `repBuildHtml` (salvo "Fecha de finalización") son idénticos al reabrir. `serializeNoti(row)` =
+  `{v:1,row (sin _cloud*/_qid),txt:genText(row),filename:fileNameOf(row)}`; `deserializeNoti` = copia +
+  `id=++uid` + `recompAuto`. Filas de `reportes`: `{kind:"calibracion"|"notificacion",tag,ot,titulo,payload}`;
+  `guardar()` hace **upsert por `(user_id,kind,tag,ot)`** (re-guardar actualiza, no duplica; efecto
+  colateral: dos calibraciones del mismo TAG con certificado vacío se pisan → el certificado arranca = OT)
+  o `PATCH` por `_cloudId`. Fallo offline/5xx → **cola** `noti_pending_v1` (`flushPending` al arrancar, al
+  volver `online`, tras guardar OK o con "Reintentar ahora"); 4xx (403 pendiente/revocado, 413, 23505) →
+  no se encola, `_cloudError`. Estado visible con `cloudBadge(row)` (cardHtml) y `#repNubeMsg`
+  (`renderRepStatus`). `listar/abrir/dlPdf/dlJson/dlTxt/eliminar` en la pestaña **Mis reportes**
+  (`switchTab("mis")`); `abrir` usa `repBatchPut` (reemplaza en `REP_BATCH` por TAG) y `repSelectShow`.
+  El botón "Guardar" de cada notificación pasó a **"Guardar en mi cuenta"** (marca `saved` + `guardarNoti`);
+  botones nuevos `#btnNubeTodas`, `#repGuardarNube`, `#repGuardarNubeTodos`.
+- **`adminUsers`** (solo `auth.isAdmin()`): pestaña **Usuarios** (`#tabAdmin`, oculta si no es admin):
+  aprobar/revocar (`profiles.approved`) y rol (`profiles.role`); no puede tocarse a sí mismo. También puebla
+  `#misUser` (filtro por usuario en Mis reportes).
+- **Sesión local por usuario**: `saveSession` guarda `owner=CURRENT_USER.id`; `loadSession` devuelve `false`
+  si `owner` es de otra cuenta (no se mezclan sesiones en un PC compartido).
+- **RLS (resumen)**: `profiles` select propio o admin, update solo admin (+trigger `profiles_guard`);
+  `reportes` select/delete propio o admin, insert/update propio **y aprobado**; helpers `is_admin()` /
+  `is_approved()` SECURITY DEFINER (evitan recursión); `anon` sin acceso. Primer admin por SQL en el
+  dashboard (`update public.profiles set role='admin', approved=true where email='…'`).
+- **Estilo**: todo en ES5 (`var`, `function(){}`, `.then/.catch`; sin arrow functions, `?.`, `??` ni
+  template literals) para que `node --check` y el harness sigan funcionando.
+
 ## Estructura de una entrada de DEFAULT_MAP_ARR
 - **Directa**: `{prefijo, nombre, proc:"P-SG-####", descripcion, equipos}`.
 - **Con opciones** (varias tecnologías; el técnico elige por orden en un desplegable):
@@ -290,8 +352,12 @@ está en medio y el archivo se regenera).
   v10 SHUTDOWN + TV, v11 descripciones 100% en pasado + sin menciones de reemplazo/cambio de piezas,
   v12 SOV/VSP marcadas `onoff` → sin línea "Calibrado en el rango").
   Otras claves de `localStorage`: `noti_calib_v1` (base de calibración adjuntada;
-  el `.json` ahora es `version:2` = `{tags, reportes}`, y `reportes` alimenta la pestaña de reporte) y
-  `noti_session_v1` (sesión auto-guardada).
+  el `.json` ahora es `version:2` = `{tags, reportes}`, y `reportes` alimenta la pestaña de reporte),
+  `noti_session_v1` (sesión auto-guardada; ahora lleva `owner` = id del usuario), `noti_auth_v1` (sesión de
+  Supabase cacheada: tokens + perfil) y `noti_pending_v1` (cola de reportes por subir). `sessionStorage`:
+  `noti_auth_msg` (aviso tras cerrar sesión por expiración).
+- **Footer**: ya no dice "Ningún dato se envía a servidores"; indica que los reportes se guardan en la
+  cuenta (Supabase) y que guardar requiere internet.
 - **LIT** (transmisor indicador de nivel) es **entrada propia** con las mismas opciones de nivel que LT
   (`multi(...LEVEL)`; el técnico elige el procedimiento en el desplegable). Está en `CALIB_ANEXA` como LT.
 - **Enter tras cada línea de la descripción**: `recompAuto` normaliza `autoDesc` con `split(/\n+/).join("\n\n")`,
@@ -323,6 +389,11 @@ Tableros: **notificaciones** `4b85f680-9773-4929-9d77-f9cbce5fcef1` y **notifica
 4. `python src/build_config.py` → `powershell -File build.ps1`.
 
 ## Verificación (sin navegador)
+Desde el login, el stub debe proveer `localStorage`, `sessionStorage`, `navigator.onLine`, `location.reload`,
+`window.addEventListener` y un `fetch` simulado (`auth.init` corre al cargar; sin caché de sesión NO llama a
+la red). El arnés `e2e_auth.js` (scratchpad) cubre: gate sin caché, arranque con caché, autollenado,
+round-trip calibración/notificación, wrapper `sb` (errores legibles, 401→refresh→reintento, offline,
+refresco proactivo, upsert), cola offline, pendiente/revocado/sesión inválida, offline con caché y `owner`.
 El JS de la app se extrae de `index.html` (2º `<script>`) y se prueba con Node + stub de DOM en el
 scratchpad: `node --check` (sintaxis) y scripts que comprueban matcheo de prefijos por planta, variantes
 ISA, tipo de orden, tablas de válvula, prefijo `.`, pasado afirmativo, fechas (inicio=fin), autorrelleno

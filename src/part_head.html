@@ -141,6 +141,29 @@
   .tab.active{color:var(--ink-strong);border-bottom-color:var(--accent)}
   .tabpanel{display:none}
   .tabpanel.active{display:block}
+  /* ---- [hidden] (los bloques nuevos usan display:flex) ---- */
+  [hidden]{display:none!important}
+  /* ---- Acceso (overlay propio; NO toca .wrap, que lo manipula repPdfFrom) ---- */
+  #authGate{position:fixed;inset:0;z-index:1000;background:var(--canvas);display:flex;align-items:center;justify-content:center;padding:24px}
+  .authcard{width:100%;max-width:440px;margin:0;animation:none}
+  .authcard h2{font-family:var(--serif);font-weight:500;font-size:24px;letter-spacing:-.01em;margin:0 0 6px;color:var(--ink-strong)}
+  .authview{display:none}.authview.active{display:block}
+  .authcard .fld{margin-top:14px}
+  .authcard input{width:100%}
+  .authmsg{min-height:20px;margin-top:12px}.authmsg.err{color:var(--red-tx)}
+  .authfoot{margin:14px 0 0;font-size:13px;color:var(--muted)}
+  body.gated{overflow:hidden}
+  @media print{#authGate{display:none!important}}
+  /* ---- Barra de usuario en la cabecera ---- */
+  header{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;flex-wrap:wrap}
+  .hdtext{min-width:0}
+  .userbar{display:flex;align-items:center;gap:12px;font-size:13px;white-space:nowrap;padding-top:6px}
+  .userbar .btn{margin-top:0;padding:7px 12px}
+  .userbar strong{font-weight:600;color:var(--ink-strong)}
+  .cloudst{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.02em}
+  /* ---- Mis reportes / Usuarios ---- */
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+  .sectionhd select{width:auto;margin:0;padding:7px 10px;font-size:13px}
 
   /* ---- Generador de reporte (formulario en pantalla) ---- */
   .rgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 18px}
@@ -209,14 +232,25 @@
 <body>
 <div class="wrap">
 <header>
-  <p class="kicker">Mantenimiento · Instrumentación</p>
-  <h1>Notificaciones de Trabajo</h1>
-  <p>Adjunta un Excel o pega la tabla (OT + denominación de objeto técnico). El sistema identifica el TAG de cada orden, lo asocia a su procedimiento P-SG y genera una plantilla de notificación <strong>.txt</strong> por cada OT, editable y descargable.</p>
+  <div class="hdtext">
+    <p class="kicker">Mantenimiento · Instrumentación</p>
+    <h1>Notificaciones de Trabajo</h1>
+    <p>Adjunta un Excel o pega la tabla (OT + denominación de objeto técnico). El sistema identifica el TAG de cada orden, lo asocia a su procedimiento P-SG y genera una plantilla de notificación <strong>.txt</strong> por cada OT, editable y descargable.</p>
+  </div>
+  <div class="userbar" id="userBar" hidden>
+    <span class="badge" id="ubRole"></span>
+    <span><strong id="ubName"></strong><br><span class="cloudst" id="ubEmail"></span></span>
+    <span class="badge warn" id="ubOffline" hidden>sin conexión</span>
+    <span class="badge info" id="ubPend" hidden></span>
+    <button id="btnLogout" class="btn ghost">Cerrar sesión</button>
+  </div>
 </header>
 
 <div class="tabs" role="tablist">
   <button class="tab active" id="tabNoti" data-tab="noti" role="tab">Notificaciones</button>
   <button class="tab" id="tabReporte" data-tab="reporte" role="tab">Reporte de calibración</button>
+  <button class="tab" id="tabMis" data-tab="mis" role="tab">Mis reportes</button>
+  <button class="tab" id="tabAdmin" data-tab="admin" role="tab" hidden>Usuarios</button>
 </div>
 
 <div id="panel-noti" class="tabpanel active">
@@ -269,6 +303,7 @@
     <span id="countBadge" class="badge"></span>
     <span class="grow"></span>
     <button id="btnClearSession" class="btn ghost" style="margin-top:0">Vaciar sesión</button>
+    <button id="btnNubeTodas" class="btn" style="margin-top:0">Guardar todas en mi cuenta</button>
     <button id="btnZip" class="btn primary" style="margin-top:0">Descargar todos (.zip)</button>
   </div>
   <div id="rows"></div>
@@ -296,16 +331,81 @@
     </div>
     <div id="repMsg" class="hint" style="margin-top:12px"></div>
     <div id="repForm" style="display:none;margin-top:8px"></div>
-    <div id="repActions" style="display:none;margin-top:18px;padding-top:16px;border-top:1px solid var(--line);justify-content:flex-end;gap:8px">
+    <div id="repActions" style="display:none;margin-top:18px;padding-top:16px;border-top:1px solid var(--line);justify-content:flex-end;gap:8px;align-items:center;flex-wrap:wrap">
+      <span id="repNubeMsg" class="cloudst" style="flex:1"></span>
       <button id="repGrabar" class="btn" style="margin-top:0">Grabar a la base de datos</button>
       <button id="repGenerar" class="btn ghost" style="margin-top:0">Generar reporte (PDF)</button>
       <button id="repDescargar" class="btn" style="margin-top:0">Descargar reporte (PDF)</button>
-      <button id="repDescargarTodos" class="btn primary" style="margin-top:0">Descargar todos (PDF)</button>
+      <button id="repDescargarTodos" class="btn" style="margin-top:0">Descargar todos (PDF)</button>
+      <button id="repGuardarNubeTodos" class="btn" style="margin-top:0">Guardar todos en mi cuenta</button>
+      <button id="repGuardarNube" class="btn primary" style="margin-top:0">Guardar en mi cuenta</button>
     </div>
   </section>
 </div><!-- /panel-reporte -->
 
-<footer>Funciona 100% en tu navegador · Ningún dato se envía a servidores · <span title="Fecha de compilación. Si no coincide con la última, recarga con Ctrl+Shift+R.">versión <!--BUILD--></span></footer>
+<div id="panel-mis" class="tabpanel">
+  <section class="card">
+    <div class="sectionhd">
+      <span class="num">M</span>
+      <h2>Mis reportes</h2>
+      <span id="misCount" class="badge"></span>
+      <span class="grow"></span>
+      <select id="misKind"><option value="">Todos</option><option value="calibracion">Calibraciones</option><option value="notificacion">Notificaciones</option></select>
+      <select id="misUser" hidden><option value="">Todos los usuarios</option></select>
+      <button id="misRefresh" class="btn ghost" style="margin-top:0">Actualizar</button>
+    </div>
+    <p class="hint" style="margin-top:0">Reportes de calibración y notificaciones guardados en tu cuenta. <b>Abrir</b> los carga en su pestaña para seguir editando; <b>PDF / JSON / .txt</b> descargan tal como se guardaron; <b>Eliminar</b> los borra de la cuenta.</p>
+    <div id="misPend" hidden></div>
+    <div id="misMsg" class="hint"></div>
+    <div class="tbl-wrap"><div id="misList"></div></div>
+  </section>
+</div><!-- /panel-mis -->
+
+<div id="panel-admin" class="tabpanel">
+  <section class="card">
+    <div class="sectionhd">
+      <span class="num">A</span>
+      <h2>Usuarios</h2>
+      <span id="admCount" class="badge"></span>
+      <span class="grow"></span>
+      <button id="admRefresh" class="btn ghost" style="margin-top:0">Actualizar</button>
+    </div>
+    <p class="hint" style="margin-top:0">Los técnicos se registran y quedan <b>pendientes</b>. Aquí los apruebas (podrán guardar en su cuenta), los revocas o les das rol de administrador.</p>
+    <div id="admMsg" class="hint"></div>
+    <div class="tbl-wrap"><div id="admList"></div></div>
+  </section>
+</div><!-- /panel-admin -->
+
+<footer>Funciona en tu navegador · Los reportes se guardan en tu cuenta (Supabase) · Sin conexión puedes generar .txt/PDF; guardar requiere internet · <span title="Fecha de compilación. Si no coincide con la última, recarga con Ctrl+Shift+R.">versión <!--BUILD--></span></footer>
 </div>
 <div id="reportPrint" aria-hidden="true"></div>
+<div id="authGate">
+  <section class="card authcard">
+    <p class="kicker">Mantenimiento · Instrumentación</p>
+    <div id="authLoading" class="authview active"><h2>Notificaciones de Trabajo</h2><p class="hint" style="margin:0">Comprobando tu sesión…</p></div>
+    <div id="authLogin" class="authview">
+      <h2>Iniciar sesión</h2>
+      <label class="fld" for="auEmail">Correo</label><input type="email" id="auEmail" autocomplete="username">
+      <label class="fld" for="auPass">Contraseña</label><input type="password" id="auPass" autocomplete="current-password">
+      <button id="btnLogin" class="btn primary" style="width:100%;justify-content:center;margin-top:16px">Entrar</button>
+      <p class="authfoot">¿No tienes cuenta? <button class="lnk" id="lnkToSignup">Regístrate</button></p>
+    </div>
+    <div id="authSignup" class="authview">
+      <h2>Registro</h2>
+      <p class="hint" style="margin:0">Tu cuenta queda <b>pendiente</b> hasta que un administrador la apruebe.</p>
+      <label class="fld" for="suName">Nombre completo (así saldrá en los reportes)</label><input type="text" id="suName" placeholder="p. ej. LUIS RICO" autocomplete="name">
+      <label class="fld" for="suEmail">Correo</label><input type="email" id="suEmail" autocomplete="username">
+      <label class="fld" for="suPass">Contraseña (mínimo 8 caracteres)</label><input type="password" id="suPass" autocomplete="new-password">
+      <label class="fld" for="suPass2">Repite la contraseña</label><input type="password" id="suPass2" autocomplete="new-password">
+      <button id="btnSignup" class="btn primary" style="width:100%;justify-content:center;margin-top:16px">Crear cuenta</button>
+      <p class="authfoot">¿Ya tienes cuenta? <button class="lnk" id="lnkToLogin">Inicia sesión</button></p>
+    </div>
+    <div id="authPending" class="authview">
+      <h2>Cuenta pendiente de aprobación</h2>
+      <p class="hint" style="margin:0">Hola <b id="pendName"></b>. Un administrador debe aprobar tu cuenta antes de que puedas guardar reportes. Avísale y pulsa <b>Volver a comprobar</b>.</p>
+      <button id="btnPendCheck" class="btn primary">Volver a comprobar</button> <button id="btnPendLogout" class="btn ghost">Cerrar sesión</button>
+    </div>
+    <p id="authMsg" class="hint authmsg" aria-live="polite"></p>
+  </section>
+</div>
 <script>

@@ -5,8 +5,12 @@ asociando el **TAG** (denominación de objeto técnico) a su **procedimiento P-S
 plantilla con los datos del instrumento tomados de la base de calibración **DPCTrack2**: **rango**,
 **señal de salida**, **patrones utilizados**, **técnico** e **indicación** del último reporte.
 
-Todo corre **en el navegador**, sin servidor y sin enviar datos a ningún lado.
-Es un único archivo: **`index.html`** (incluye la librería de Excel incrustada, funciona offline).
+La interfaz corre **en el navegador** como un único archivo **`index.html`** (librerías incrustadas).
+Para usarla hay que **iniciar sesión** con una cuenta **aprobada por un administrador**; los reportes de
+calibración y las notificaciones que generes se **guardan en tu cuenta** (Supabase) y puedes reabrirlos
+desde cualquier PC. Sin internet puedes seguir generando `.txt`/PDF con la sesión ya iniciada; **guardar en
+la cuenta requiere internet** (si no hay, queda en cola y sube al reconectar). Ver *Cuenta, aprobación y
+guardado en la nube*.
 Los datos de calibración vienen **incrustados** en `index.html` y pueden **actualizarse a futuro**
 adjuntando un archivo (ver *Base de calibración* más abajo).
 
@@ -15,8 +19,9 @@ Procedimiento**; debajo, a ancho completo, **03 · Notificaciones** (aparece al 
 sigue una estética de minimalismo editorial (paleta cálida monocroma, tipografía serif en títulos, sin
 gradientes ni sombras marcadas).
 
-La app tiene **dos pestañas** arriba: **Notificaciones** (generar las plantillas `.txt` de las órdenes) y
-**Reporte de calibración** (generar el informe de calibración en PDF de un instrumento; ver más abajo).
+La app tiene **cuatro pestañas** arriba: **Notificaciones** (generar las plantillas `.txt` de las órdenes),
+**Reporte de calibración** (generar el informe de calibración en PDF de un instrumento; ver más abajo),
+**Mis reportes** (lo guardado en tu cuenta) y, solo para administradores, **Usuarios** (aprobar cuentas).
 
 ## Uso local (pestaña Notificaciones)
 1. Doble clic en `index.html` (se abre en tu navegador).
@@ -42,14 +47,17 @@ La app tiene **dos pestañas** arriba: **Notificaciones** (generar las plantilla
        tomados de la base). PT/PIT/LT añaden *"Datos de calibración se encuentran anexos a la orden de trabajo."*
      - **¿Qué equipos o patrones se utilizaron?**: lista los **patrones del último reporte** (TAG − descripción).
      - **Cómo se dejó el equipo**: si la nota del reporte lo registra, añade *"Se dejó con indicación de …"*.
-     - **Trabajo realizado por**: nombre del técnico del último reporte, **solo si ese reporte es reciente**
-       (menos de 2 meses respecto a la fecha de la plantilla); si es antiguo, queda vacío para llenarlo a mano.
+     - **Trabajo realizado por**: el **nombre del usuario con sesión iniciada** (en mayúsculas). Si no hay
+       sesión, el técnico del último reporte **solo si es reciente** (menos de 2 meses respecto a la fecha de
+       la plantilla); si no, queda vacío para llenarlo a mano.
    - Cuando el TAG **no está** en la base, esos campos quedan vacíos (etiqueta sin valor): nunca se inventan.
 4. Flujo de trabajo por orden:
    - **Vista previa**: muestra el `.txt` **exacto** (con los puntos al inicio de cada línea) tal como se
      descargará; se actualiza mientras editas. Vuelve a pulsar para ocultarla.
-   - Edita los campos y pulsa **Guardar** (la orden queda marcada con ✓ en el desplegable y avanza el
-     contador "X de N guardadas"). Elige otra orden en el desplegable y repite.
+   - Edita los campos y pulsa **Guardar en mi cuenta** (la orden queda marcada con ✓ en el desplegable,
+     avanza el contador "X de N guardadas" y la notificación se **guarda en tu cuenta** en la nube; el badge
+     ☁ indica si ya subió o quedó pendiente). **Guardar todas en mi cuenta** (tarjeta 03) las sube todas.
+     Elige otra orden en el desplegable y repite.
    - En la orden abierta puedes **Copiar al portapapeles** toda la plantilla o **Descargar este `.txt`**
      (nombre `OT-TAG.txt`).
    - Cuando termines, **Descargar todos (.zip)** genera todas las plantillas en un ZIP.
@@ -84,6 +92,10 @@ y editarlos uno por uno.
 **Descargar reporte (PDF)** (baja directo el del instrumento actual) y **Descargar todos (PDF)** (baja
 **un PDF por instrumento**).
 
+**Guardar en mi cuenta:** *Guardar en mi cuenta* guarda el reporte actual (con tus ediciones) en tu cuenta;
+*Guardar todos en mi cuenta* sube todo el lote. Los campos **Quién realizó la calibración** y **Finalizado
+por** se autollenan con el usuario con sesión (editables). Lo guardado se reabre desde **Mis reportes**.
+
 **Grabar a la base de datos:** el botón **descarga un JSON** con todos los instrumentos para meterlos a la
 base editable y que DPCTrack los lea igual. El paso a paso está en
 **[ACTUALIZAR-BASE-DE-DATOS.md](ACTUALIZAR-BASE-DE-DATOS.md)**.
@@ -116,9 +128,54 @@ las líneas empiezan con un punto (`.`)**. El flujo es idéntico para Excel y pe
 ambos muestran las plantillas editables (y las mismas preguntas/desplegables) antes de descargar.
 
 En la tarjeta **02 · Mapeo** puedes agregar/corregir prefijos, **exportar/importar** el mapeo
-como JSON y **restablecer**. Los cambios se guardan en tu navegador (localStorage, clave `noti_mapping_v6`).
+como JSON y **restablecer**. Los cambios se guardan en tu navegador (localStorage, clave `noti_mapping_v12`).
 El **TAG** es el primer dato que mezcla letras y números (p. ej. `PT-3110`, `3110-PT-001`, `PT-U2411`),
 aunque lleve delante el código de área o de planta.
+
+## Cuenta, aprobación y guardado en la nube
+La app pide **iniciar sesión** (correo y contraseña). Funciona así:
+1. **Registro**: pulsa *Regístrate*, escribe tu **nombre completo** (así saldrá en los reportes), correo y
+   contraseña (mínimo 8). La cuenta queda **pendiente de aprobación**.
+2. **Aprobación**: un **administrador** entra a la pestaña **Usuarios** y pulsa **Aprobar** (también puede
+   revocar o dar rol de administrador). Mientras tanto verás la pantalla *"Cuenta pendiente"*; pulsa
+   **Volver a comprobar** cuando te avisen.
+3. **Uso**: con la cuenta aprobada, tu nombre **autollena** *Trabajo realizado por* (notificaciones) y
+   *Quién realizó la calibración* / *Finalizado por* (reportes); todos siguen editables.
+4. **Guardar en mi cuenta**: cada notificación (botón de la orden o *Guardar todas en mi cuenta*) y cada
+   reporte de calibración (*Guardar en mi cuenta* / *Guardar todos en mi cuenta*) se guardan en la nube
+   atribuidos a tu usuario. Volver a guardar la misma orden/TAG **actualiza** el registro (no duplica).
+5. **Mis reportes**: lista lo guardado (tipo, TAG, OT, fecha). **Abrir** lo carga en su pestaña para seguir
+   editando; **PDF / JSON / .txt** lo descargan tal como se guardó; **Eliminar** lo borra. El administrador
+   ve los reportes de **todos** los usuarios (con filtro por usuario).
+6. **Sin internet**: si ya iniciaste sesión en ese navegador, entras igual y puedes generar `.txt`/PDF/ZIP.
+   Al guardar aparece *"pendiente de subir"*; se **sube solo al volver la conexión** (o con *Reintentar
+   ahora* en Mis reportes). Iniciar sesión por primera vez y consultar Mis reportes sí requieren internet.
+7. **Cerrar sesión** (botón de la cabecera) borra la sesión de ese navegador. La sesión de trabajo local
+   (órdenes cargadas) es **por usuario**: no se mezcla con la de otra cuenta en el mismo PC.
+
+> El login protege lo que se guarda en tu cuenta y atribuye cada reporte a quien lo hizo. Los datos de
+> calibración y el mapeo van incrustados en la página (son públicos en el repo), como antes.
+
+## Configurar Supabase (una vez)
+El backend es un proyecto gratuito de [Supabase](https://supabase.com) (Postgres + autenticación). Pasos:
+1. Crea un proyecto en supabase.com (región cercana; la contraseña de la base de Postgres no se usa en la app).
+2. **SQL Editor** → pega el contenido de **`supabase/schema.sql`** → *Run*. Crea `profiles`, `reportes`, el
+   trigger que da de alta el perfil al registrarse (pendiente) y las políticas RLS (cada usuario solo lo suyo;
+   solo aprobados guardan; administradores ven todo y aprueban).
+3. **Authentication → Providers → Email**: *Enable* ON y **Confirm email OFF** (la aprobación del
+   administrador es el filtro). **Sign In / Providers**: *Allow new users to sign up* ON.
+   **URL Configuration → Site URL**: `https://luisrico5.github.io/notificaciones-trabajo/`.
+4. **Project Settings → API**: copia **Project URL** y **anon public key** y pégalos en
+   `src/part_tail.html` (`SB_URL` y `SB_ANON_KEY`); reconstruye (`build.ps1`) y publica. Hasta que lo hagas,
+   la pantalla de acceso avisa *"Falta configurar la conexión a Supabase"*. La anon key es pública por diseño
+   (los datos los protege RLS); la **`service_role` key nunca** va en la app ni en el repo.
+5. **Primer administrador**: regístrate desde la app con tu correo y en el SQL Editor ejecuta
+   `update public.profiles set role='admin', approved=true where email='TU_CORREO';`. Desde ese momento
+   verás la pestaña **Usuarios**.
+
+> Plan gratuito: el proyecto se **pausa tras ~7 días sin uso** (botón *Restore* en el dashboard); mientras
+> está pausado la app se comporta como "sin conexión". Eliminar un usuario en *Authentication → Users*
+> borra también sus reportes guardados.
 
 ## Base de calibración (rangos, salidas, patrones, técnico, indicación)
 Estos datos vienen **incrustados** en `index.html` desde la base DPCTrack2. Para **actualizarlos a futuro
@@ -149,10 +206,11 @@ src/
   extract_ranges.ps1  Lee la base .mdb y vuelca rango/salida/patrones/técnico/indicación por TAG.
   answers/            Resúmenes de cada procedimiento P-SG (fuente del mapeo).
 datos_calibracion.json   Datos de calibración portables (para adjuntar en la app). Generado.
+supabase/schema.sql   Esquema de cuentas y reportes (tablas, trigger de perfil, RLS). Se pega en Supabase. Sin secretos.
 20260810_dpctrack2_backup.mdb   Base DPCTrack2 (con contraseña). NO publicar.
 zzz/                Binarios del programa DPCTrack2 (referencia). NO publicar.
 ```
-`index.html` se arma juntando `part_head.html` + `xlsx.full.min.js` + `part_tail.html`.
+`index.html` se arma juntando `part_head.html` + `xlsx.full.min.js` + `html2pdf.bundle.min.js` + `part_tail.html`.
 
 ## Cómo hacer cambios (ahora y a futuro)
 **Regla de oro:** edita en `src/` y reconstruye. No edites `index.html` directamente (se sobrescribe y la
@@ -183,10 +241,13 @@ Cambios típicos:
 
 > Detalles de arquitectura, funciones clave y cómo verificar sin navegador: ver **`CLAUDE.md`**.
 
-## Publicar en GitHub (más adelante)
-1. `git init` en esta carpeta y sube el sitio y las fuentes (`index.html`, `README.md`, `CLAUDE.md`,
-   `src/`, `build.*`). **No subas** la base `*.mdb`, la carpeta `zzz/` ni la contraseña —el `.gitignore`
-   ya los excluye (quita también el valor por defecto de la clave en `src/extract_ranges.ps1`).
-   Los datos de calibración ya quedan incrustados en `index.html`, así que el sitio no necesita la base.
-2. En el repo: **Settings → Pages → Deploy from branch → main / root**.
-3. La URL de GitHub Pages servirá `index.html` directamente (la carpeta `src/` no afecta al sitio).
+## Publicar en GitHub Pages
+El sitio está publicado en **https://luisrico5.github.io/notificaciones-trabajo/** (repo
+`luisrico5/notificaciones-trabajo`, *Settings → Pages → Deploy from branch → main / root*). Cada `git push`
+a `main` actualiza la página en un momento.
+- Se suben `index.html`, `README.md`, `CLAUDE.md`, `src/`, `build.*`, `supabase/schema.sql` y
+  `datos_calibracion.json`. **No subas** la base `*.mdb`, la carpeta `zzz/`, los `grabar_*.json`, el
+  `grabar.bat` ni la contraseña de la base: el `.gitignore` ya los excluye.
+- `SB_URL` y `SB_ANON_KEY` (la **anon key** pública de Supabase) sí van en `src/part_tail.html`: es lo
+  previsto, los datos los protege RLS. La **`service_role` key nunca** va en la app ni en el repo.
+- Los datos de calibración quedan incrustados en `index.html`, así que el sitio no necesita la base.
