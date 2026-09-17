@@ -3302,20 +3302,27 @@ function repGrabarPayload(st){
     grupos:grupos, patrones:(st.std||[])
   };
 }
-/* Descarga UN SOLO JSON con TODOS los instrumentos cargados (para actualizar la base de una vez). */
-function repGrabar(){
+/* Texto del JSON con TODOS los instrumentos cargados: {fn, text, n, tags}. Es EXACTAMENTE lo que se descarga para
+   grabar.bat y lo que recibe el grabado en línea (mismo contenido, misma lógica). null si no hay reportes. */
+function repGrabarJson(){
   repFlushEdits();   // vuelca al estado el N.º de puntos / rangos que el técnico dejó sin confirmar (clic directo)
   var list = REP_BATCH.length ? REP_BATCH : (repState?[repState]:[]);
-  if(!list.length){ alert("No hay reportes cargados. Procesa datos en la pestaña Notificaciones o busca un TAG."); return; }
+  if(!list.length) return null;
   var cals=list.map(function(st){ return repGrabarPayload(st); });
   var payload={ version:1, generado:todayDMY(), calibraciones:cals };
   var fn="grabar_calibraciones_"+todayDMY().replace(/\//g,"")+".json";
-  downloadText(fn, JSON.stringify(payload,null,1));
-  alert("Se descargó \""+fn+"\" con "+cals.length+" instrumento(s).\n\n"+
-        "El navegador no puede escribir la base de datos directamente. Para grabar TODO en la base EDITABLE, "+
-        "ejecuta en PowerShell (en la carpeta del proyecto):\n\n"+
-        "powershell -ExecutionPolicy Bypass -File src\\grabar_reporte.ps1 -Json \""+fn+"\" -Password \"<clave>\"\n\n"+
-        "Luego abre 20260810_dpctrack2_editable.mdb en DPCTrack2 y genera los reportes.");
+  return { fn:fn, text:JSON.stringify(payload,null,1), n:cals.length, tags:cals.map(function(c){ return c.tag; }) };
+}
+/* Descarga UN SOLO JSON con TODOS los instrumentos cargados (para actualizar la base de una vez con grabar.bat). */
+function repGrabar(){
+  var j=repGrabarJson();
+  if(!j){ alert("No hay reportes cargados. Procesa datos en la pestaña Notificaciones o busca un TAG."); return; }
+  downloadText(j.fn, j.text);
+  alert("Se descargó \""+j.fn+"\" con "+j.n+" instrumento(s).\n\n"+
+        "Para grabar TODO en la base EDITABLE: arrastra este JSON (y la base editable .mdb) sobre grabar.bat, "+
+        "o ejecuta en PowerShell (en la carpeta del proyecto):\n\n"+
+        "powershell -ExecutionPolicy Bypass -File src\\grabar_reporte.ps1 -Json \""+j.fn+"\" -Mdb \"<base editable .mdb>\" -Password \"<clave>\"\n\n"+
+        "Luego abre la base editable en DPCTrack2 y genera los reportes.");
 }
 
 /* ---------- Wiring de la pestaña de reporte ---------- */
@@ -3395,7 +3402,183 @@ function repGrabar(){
   document.getElementById("repGenerar").addEventListener("click", repGenerar);
   document.getElementById("repDescargar").addEventListener("click", repDescargar);
   document.getElementById("repDescargarTodos").addEventListener("click", repDescargarTodos);
-  document.getElementById("repGrabar").addEventListener("click", repGrabar);
+  document.getElementById("repGrabar").addEventListener("click", function(){ dbGrabar.abrir(); });
+})();
+
+/* ============================================================================
+   GRABAR EN LÍNEA LA BASE DPCTrack2 (.mdb) — diálogo del botón "Grabar a la base de datos"
+   - Opción 1: el usuario elige la base editable de SU PC; se graba en memoria dentro del navegador con
+     MDBW_FACTORY (src/grabar_mdb.js = port de src/grabar_reporte.ps1 compilado a JavaScript; ver mdbwriter/),
+     se autoverifica y se ofrece descargar con el mismo nombre. Nada sale del navegador y el archivo original
+     no se toca. Corre en un Web Worker (la página no se congela); si el navegador no deja crear el worker,
+     corre en el hilo principal.
+   - Opción 2: repGrabar() de siempre (descarga el JSON para grabar.bat), sin cambios.
+   ============================================================================ */
+/* Cuerpo del Web Worker (se serializa con toString; no usa nada de fuera salvo MDBW_FACTORY). */
+function mdbwWorkerMain(){
+  var api=null;
+  function fin(m, transfer){ self.postMessage(m, transfer||[]); }
+  self.onmessage=function(e){
+    var m=e.data||{};
+    if(m.tipo!=="grabar") return;
+    try{
+      if(!api) api=MDBW_FACTORY();
+      var r=mdbwEjecutar(api, m.buffer, m.json, m.ahora, m.nombre);
+      m.buffer=null;
+      fin({tipo:"fin", res:r.res, partes:r.partes}, r.partes);
+    }catch(err){
+      try{ if(api) api.liberar(); }catch(_){}
+      fin({tipo:"fin", res:{ok:false, error:String((err&&err.message)||err)}});
+    }
+  };
+  fin({tipo:"listo"});
+}
+/* Pasos comunes (worker o hilo principal): cargar por trozos -> grabar+verificar -> leer por trozos. */
+function mdbwEjecutar(api, buffer, json, ahora, nombre){
+  var TROZO=8*1024*1024, total=buffer.byteLength, off, n, res, partes=[];
+  api.nuevaBase();
+  for(off=0; off<total; off+=TROZO){ n=Math.min(TROZO,total-off); api.agregarBytes(new Int8Array(buffer,off,n)); }
+  res=JSON.parse(api.grabar(json, ahora, true, nombre));
+  if(res.ok){
+    var sz=api.tamano();
+    for(off=0; off<sz; off+=TROZO){
+      var p=api.leerBytes(off, Math.min(TROZO, sz-off));
+      if(p.byteOffset!==0 || p.buffer.byteLength!==p.byteLength) p=p.slice();
+      partes.push(p.buffer);
+    }
+  }
+  api.liberar();
+  return { res:res, partes:partes };
+}
+var dbGrabar=(function(){
+  var archivo=null, salida=null, ocupado=false, reloj=null, apiLocal=null;
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
+  function mb(b){ return (b/1048576).toFixed(1).replace(".",",")+" MB"; }
+  function estado(html, cls){ var el=$("dbEstado"); el.className="dbst"+(cls?" "+cls:""); el.innerHTML=html||""; }
+  function ahoraIso(){
+    var d=new Date(), z=function(x,k){ x=String(x); while(x.length<(k||2)) x="0"+x; return x; };
+    return d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate())+"T"+z(d.getHours())+":"+z(d.getMinutes())+":"+z(d.getSeconds())+"."+z(d.getMilliseconds(),3);
+  }
+  function refrescar(){
+    $("dbProcesar").disabled = ocupado || !archivo;
+    $("dbJson").disabled = ocupado;
+    $("dbCerrar").disabled = ocupado;
+    $("dbFile").disabled = ocupado;
+    $("dbFileName").textContent = archivo ? (archivo.name+" · "+mb(archivo.size)) : "Ninguna base elegida";
+  }
+  function limpiarResultado(){
+    salida=null; $("dbDescargaRow").hidden=true; $("dbLog").hidden=true; $("dbLog").textContent=""; estado("");
+  }
+  function abrir(){
+    var j=repGrabarJson();
+    if(!j){ alert("No hay reportes cargados. Procesa datos en la pestaña Notificaciones o busca un TAG."); return; }
+    $("dbResumen").innerHTML="Se grabarán <b>"+j.n+"</b> instrumento(s): "+esc(j.tags.join(", "))+".";
+    if(!ocupado && !salida) limpiarResultado();
+    refrescar();
+    $("dbModal").hidden=false; document.body.classList.add("modal-open");
+  }
+  function cerrar(){
+    if(ocupado) return;
+    $("dbModal").hidden=true; document.body.classList.remove("modal-open");
+  }
+  function leerArchivo(f){
+    if(f.arrayBuffer) return f.arrayBuffer();
+    return new Promise(function(res, rej){ var fr=new FileReader(); fr.onload=function(){ res(fr.result); }; fr.onerror=function(){ rej(fr.error||new Error("No se pudo leer el archivo")); }; fr.readAsArrayBuffer(f); });
+  }
+  function enHiloPrincipal(buf0, json, ahora, nombre){
+    var leer = (buf0 && buf0.byteLength) ? Promise.resolve(buf0) : leerArchivo(archivo);
+    return leer.then(function(buf){
+      return new Promise(function(resolve, reject){
+        setTimeout(function(){
+          try{ if(!apiLocal) apiLocal=MDBW_FACTORY(); resolve(mdbwEjecutar(apiLocal, buf, json, ahora, nombre)); }
+          catch(e){ try{ apiLocal.liberar(); }catch(_){} reject(e); }
+        }, 60);
+      });
+    });
+  }
+  function enWorker(buf, json, ahora, nombre){
+    return new Promise(function(resolve, reject){
+      var w, url, listo=false;
+      try{
+        var src="var MDBW_FACTORY="+MDBW_FACTORY.toString()+";\nvar mdbwEjecutar="+mdbwEjecutar.toString()+";\n("+mdbwWorkerMain.toString()+")();";
+        url=URL.createObjectURL(new Blob([src],{type:"text/javascript"}));
+        w=new Worker(url);
+      }catch(e){ if(url) URL.revokeObjectURL(url); reject({sinWorker:true}); return; }
+      w.onmessage=function(ev){
+        var m=ev.data||{};
+        if(m.tipo==="listo"){ listo=true; URL.revokeObjectURL(url); w.postMessage({tipo:"grabar", buffer:buf, json:json, ahora:ahora, nombre:nombre}, [buf]); return; }
+        if(m.tipo==="fin"){ w.terminate(); resolve(m); }
+      };
+      w.onerror=function(ev){
+        if(ev && ev.preventDefault) ev.preventDefault();
+        w.terminate(); URL.revokeObjectURL(url);
+        if(!listo) reject({sinWorker:true});
+        else reject(new Error((ev&&ev.message)||"El proceso de grabado se detuvo (¿memoria insuficiente?)."));
+      };
+    });
+  }
+  function procesar(){
+    if(ocupado || !archivo) return;
+    var f=archivo;
+    limpiarResultado();
+    if(/backup/i.test(f.name)){
+      estado("<b>No se grabó nada.</b> La base elegida parece la <b>_backup</b> (solo consulta): "+esc(f.name)+". Usa la base <b>editable</b>, nunca la de respaldo.","err"); return;
+    }
+    if(!/\.mdb$/i.test(f.name)){ estado("<b>No se grabó nada.</b> Elige la base de DPCTrack2 con extensión <b>.mdb</b>.","err"); return; }
+    var j=repGrabarJson();
+    if(!j){ estado("No hay reportes cargados.","err"); return; }
+    ocupado=true; refrescar();
+    var t0=Date.now(), fase="Leyendo la base…";
+    var tick=function(){ estado(fase+" <span class=\"cloudst\">("+Math.round((Date.now()-t0)/1000)+" s)</span>"); };
+    tick(); reloj=setInterval(tick, 1000);
+    var ahora=ahoraIso();
+    leerArchivo(f).then(function(buf){
+      fase="Grabando "+j.n+" instrumento(s) y verificando la base… (puede tardar hasta un minuto; no cierres la página)"; tick();
+      return enWorker(buf, j.text, ahora, f.name).catch(function(e){
+        if(e && e.sinWorker) return enHiloPrincipal(buf, j.text, ahora, f.name);
+        throw e;
+      });
+    }).then(function(out){
+      terminar();
+      var r=out.res||{};
+      if(!r.ok){
+        estado("<b>No se grabó nada.</b> "+esc(r.error||"Error desconocido")+"<br>La base original no cambió. Si el problema sigue, usa la Opción 2 (JSON + grabar.bat).","err");
+        return;
+      }
+      var log=(r.log||[]).join("\n");
+      if(r.verificacion) log+="\nVerificación: OK ("+r.verificacion.tablas+" tablas, "+r.verificacion.indices+" índices, "+r.verificacion.clavesBuscadas+" claves encontradas)";
+      $("dbLog").textContent=log; $("dbLog").hidden=false;
+      if(!r.insertados){
+        estado("No se grabó ninguna calibración: todos los instrumentos se omitieron (sin calibración previa en esa base para usar de plantilla). No hace falta descargar la base.","warn");
+        return;
+      }
+      salida={ blob:new Blob(out.partes,{type:"application/octet-stream"}), nombre:f.name };
+      estado("<b>Base actualizada y verificada.</b> "+r.insertados+" calibración(es) grabada(s)"+(r.omitidos?", "+r.omitidos+" omitida(s)":"")+
+        ". Descárgala y llévala a DPCTrack (reemplaza la base anterior; guarda una copia de la anterior si quieres).","ok");
+      $("dbDescargaInfo").textContent=f.name+" · "+mb(salida.blob.size)+" · "+((Date.now()-t0)/1000).toFixed(0)+" s";
+      $("dbDescargaRow").hidden=false;
+    }).catch(function(e){
+      terminar();
+      estado("<b>No se grabó nada.</b> "+esc((e&&e.message)||e)+"<br>La base original no cambió. Puedes usar la Opción 2 (JSON + grabar.bat).","err");
+    });
+    function terminar(){ clearInterval(reloj); reloj=null; ocupado=false; refrescar(); }
+  }
+  (function wire(){
+    $("dbFile").addEventListener("change", function(e){
+      if(ocupado) return;
+      archivo=(e.target.files&&e.target.files[0])||null; e.target.value="";
+      limpiarResultado(); refrescar();
+      if(archivo && /backup/i.test(archivo.name)) estado("Esa base parece la <b>_backup</b> (solo consulta). Elige la base <b>editable</b>.","err");
+    });
+    $("dbProcesar").addEventListener("click", procesar);
+    $("dbDescargar").addEventListener("click", function(){ if(salida) triggerBlob(salida.blob, salida.nombre); });
+    $("dbJson").addEventListener("click", function(){ if(!ocupado) repGrabar(); });
+    $("dbCerrar").addEventListener("click", cerrar);
+    $("dbModal").addEventListener("click", function(e){ if(e.target===$("dbModal")) cerrar(); });
+    document.addEventListener("keydown", function(e){ if(e.key==="Escape" && !$("dbModal").hidden) cerrar(); });
+  })();
+  return { abrir:abrir, cerrar:cerrar };
 })();
 
 /* ============================================================================

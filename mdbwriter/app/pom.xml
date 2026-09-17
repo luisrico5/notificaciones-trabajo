@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Compila el escritor de la base (grabarmdb) a JavaScript con TeaVM. Lo invoca ../build.sh. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>local.noti</groupId>
+  <artifactId>grabar-mdb</artifactId>
+  <version>1</version>
+  <packaging>jar</packaging>
+  <properties>
+    <maven.compiler.release>11</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <teavm.version>0.15.0</teavm.version>
+    <teavm.minify>true</teavm.minify>
+  </properties>
+  <dependencies>
+    <dependency><groupId>local.noti</groupId><artifactId>jackcess-web</artifactId><version>5.0.0-web</version></dependency>
+    <dependency><groupId>local.noti</groupId><artifactId>mdbshim</artifactId><version>1.0</version></dependency>
+    <dependency><groupId>org.teavm</groupId><artifactId>teavm-classlib</artifactId><version>${teavm.version}</version><scope>provided</scope></dependency>
+    <dependency><groupId>org.teavm</groupId><artifactId>teavm-jso</artifactId><version>${teavm.version}</version><scope>provided</scope></dependency>
+    <dependency><groupId>org.teavm</groupId><artifactId>teavm-jso-apis</artifactId><version>${teavm.version}</version><scope>provided</scope></dependency>
+  </dependencies>
+  <build>
+    <plugins>
+      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.13.0</version></plugin>
+      <plugin>
+        <groupId>org.teavm</groupId>
+        <artifactId>teavm-maven-plugin</artifactId>
+        <version>${teavm.version}</version>
+        <executions>
+          <execution>
+            <id>js</id>
+            <phase>process-classes</phase>
+            <goals><goal>compile</goal></goals>
+            <configuration>
+              <mainClass>grabarmdb.WebApi</mainClass>
+              <targetType>JAVASCRIPT</targetType>
+              <targetDirectory>${project.build.directory}/js</targetDirectory>
+              <targetFileName>grabar_mdb.js</targetFileName>
+              <jsModuleType>UMD</jsModuleType>
+              <minifying>${teavm.minify}</minifying>
+              <optimizationLevel>SIMPLE</optimizationLevel>
+              <stopOnErrors>true</stopOnErrors>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

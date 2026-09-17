@@ -28,6 +28,8 @@ src/
   part_tail.html      <- cierre de librería + TODA la lógica JS de la app (aquí se edita casi todo).
   xlsx.full.min.js    <- SheetJS incrustado (lectura de Excel). No modificar.
   html2pdf.bundle.min.js <- html2pdf (html2canvas + jsPDF) incrustado, para descargar reportes en PDF sin diálogo. No modificar.
+  grabar_mdb.js       <- GENERADO por mdbwriter/build.sh (NO editar): escritor de la base .mdb para "Grabar a la base
+                         de datos" EN LÍNEA (port de grabar_reporte.ps1 + Jackcess compilados a JS con TeaVM).
   build_config.py     <- Genera el mapeo TAG→procedimiento desde src/answers/ y lo inyecta en part_tail.html.
   default_map.js      <- Salida intermedia de build_config.py (referencia).
   answers/proc_*.txt  <- Resúmenes de cada procedimiento extraídos de NotebookLM (fuente del mapeo).
@@ -43,6 +45,8 @@ src/
                          reporte desde la spec, no desde la calibración (usa -NoSpec para no tocar la spec).
                          Nunca toca la contraseña ni la base _backup.
 datos_calibracion.json <- Datos de calibración portables (para adjuntar en la app). Generado.
+mdbwriter/            <- Fuentes de src/grabar_mdb.js (Java + parche de Jackcess + reescritor + shims + pruebas).
+                         Ver mdbwriter/README.md. work/ y app/target/ no se versionan.
 supabase/schema.sql   <- Esquema Supabase (profiles, reportes, trigger handle_new_user, helpers is_admin/
                          is_approved, RLS). Sin secretos; se pega en el SQL Editor del proyecto.
 .gitignore            <- Excluye *.mdb y zzz/ (no publicar base ni binarios).
@@ -59,7 +63,7 @@ zzz/                  <- Carpeta del programa DPCTrack2 (binarios). NO PUBLICAR;
 > **Etapa 3 (GitHub Pages):** publicar SOLO `index.html` (y opcionalmente `src/`). **Nunca subir** el
 > `.mdb`, la carpeta `zzz/` ni la contraseña de la base — añádelos a `.gitignore`. Los rangos ya quedan
 > incrustados en `index.html`, así que el sitio no necesita la base.
-`index.html` = `part_head.html` + `xlsx.full.min.js` + `"\n"` + `html2pdf.bundle.min.js` + `"\n"` + `part_tail.html`.
+`index.html` = `part_head.html` + `xlsx.full.min.js` + `"\n"` + `html2pdf.bundle.min.js` + `"\n"` + `grabar_mdb.js` + `"\n"` + `part_tail.html`.
 
 ## Construir
 ```
@@ -199,7 +203,18 @@ está en medio y el archivo se regenera).
   el `.pdf`). (3) **"Descargar todos (PDF)"** (`repDescargarTodos`) → **UN PDF POR INSTRUMENTO**, descarga
   directa y secuencial (encadena promesas `repPdfFrom` por cada `REP_BATCH`, nombre `<tag>.pdf`).
   `repPdfFrom` pone `#reportPrint` visible fuera de pantalla, corre `html2pdf().from(box).save()` y restaura.
-  **Botón "Grabar a la base de datos"** (`repGrabar`/`repGrabarPayload` + `src/grabar_reporte.ps1`): descarga
+  **Botón "Grabar a la base de datos" = diálogo `#dbModal` con DOS opciones** (módulo `dbGrabar`, abre con
+  `dbGrabar.abrir()`). **Opción 1 (en línea):** el usuario elige la base editable `.mdb` de su PC (`#dbFile`), se graba
+  **en memoria del navegador** con `MDBW_FACTORY` (`src/grabar_mdb.js`) dentro de un **Web Worker** creado desde
+  `MDBW_FACTORY.toString()` + `mdbwEjecutar` + `mdbwWorkerMain` (si no se puede crear, corre en el hilo principal),
+  se **autoverifica** (Verificador: conteos, todos los índices, claves y calibraciones completas) y se ofrece
+  **"Descargar base actualizada"** con el mismo nombre. Recibe **exactamente el mismo texto JSON** que la Opción 2
+  (`repGrabarJson()`), rechaza nombres con "backup" y no `.mdb`, no envía nada a servidores y no toca el archivo
+  original. Es un **port fiel de `grabar_reporte.ps1`** (`mdbwriter/app/.../GrabarMdb.java`): **si cambias la lógica
+  de grabado, cambia los dos** y corre `mdbwriter/test/run_case.sh` (ACE vs port: 8 tablas idénticas; JS = JVM byte a
+  byte). Jackcess va **parcheado** (`mdbwriter/patch`: Access deja entradas de nodo padre desactualizadas en índices
+  como el PK de `INSTSPEC`). **Opción 2 (flujo original, sin cambios):** `repGrabar` descarga el JSON para `grabar.bat`.
+  Detalle del JSON y del script (`repGrabar`/`repGrabarPayload` + `src/grabar_reporte.ps1`): descarga
   **UN SOLO JSON con TODOS los instrumentos del lote** (`{version,generado,calibraciones:[…]}`) y lo graba en
   la base DPCTrack2 **editable** para que DPCTrack los lea y produzca los reportes idénticos. Como el navegador **no puede** escribir el `.mdb` (Access cifrado, sin servidor), el botón
   **descarga un JSON** (`grabar_<tag>_<fecha>.json`) con todos los datos (cabecera, grupos con puntos y
@@ -403,6 +418,12 @@ Para la **pestaña de reporte**: se prueba `repLookup`/`repBuildState`/`desvPct`
 (0.00% e ideal→Aprobado, valor fuera de límite→Fallado, valor en el límite→% = precisión declarada) y se
 renderiza `#reportPrint` a PDF con Chrome headless (`--print-to-pdf`) para **comparar 1:1** con el informe
 de DPCTrack de referencia (`PT-U7122.pdf`).
+Para **grabar en línea** (Opción 1), siempre sobre COPIAS de la base editable y con la clave en `DPC_CLAVE`:
+`mdbwriter/test/run_case.sh` (grabar_reporte.ps1 vs port: volcado de 8 tablas + conteos idénticos; JS = JVM byte a
+byte; índices con DAO), `mdbwriter/test/e2e_navegador.js` (Chrome real headless por DevTools: diálogo, rechazo de
+_backup, Web Worker, descarga de base y JSON, original intacto, file://) y, sobre la base descargada,
+`verify_index.ps1` + compactado DAO. Tras la prueba del navegador se graba con `grabar.bat` el JSON descargado y
+la base debe quedar idéntica a la del navegador.
 Verificación real: abrir `index.html`, pegar TAGs variados (PT, FT, FIC, PIC, PV, TE, SOV, WT, PIT-…) y
 comprobar rango/salida/patrones/técnico/indicación; en la pestaña de reporte, buscar un TAG y "Generar reporte".
 

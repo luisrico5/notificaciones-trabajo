@@ -161,6 +161,18 @@
   .userbar .btn{margin-top:0;padding:7px 12px}
   .userbar strong{font-weight:600;color:var(--ink-strong)}
   .cloudst{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.02em}
+  /* ---- Diálogo "Grabar a la base de datos" (base en línea o JSON para grabar.bat) ---- */
+  .modalbg{position:fixed;inset:0;z-index:900;background:rgba(26,26,26,.32);display:flex;align-items:flex-start;justify-content:center;padding:6vh 16px;overflow-y:auto}
+  .modalcard{width:100%;max-width:720px;margin:0;animation:none}
+  .modalcard h3{margin-top:22px}
+  .dbrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .dbrow .btn{margin-top:0}
+  .dbfile{min-width:0;overflow-wrap:anywhere}
+  .dbst{margin-top:12px;font-size:13px}
+  .dbst.ok{color:var(--green-tx)} .dbst.err{color:var(--red-tx)} .dbst.warn{color:var(--yellow-tx)}
+  .dblog{font-family:var(--mono);font-size:11.5px;line-height:1.5;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;max-height:240px;overflow:auto;white-space:pre-wrap;margin:10px 0 0;color:var(--ink)}
+  body.modal-open{overflow:hidden}
+  @media print{#dbModal{display:none!important}}
   /* ---- Mis reportes / Usuarios ---- */
   .tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
   .sectionhd select{width:auto;margin:0;padding:7px 10px;font-size:13px}
@@ -313,7 +325,7 @@
 <div id="panel-reporte" class="tabpanel">
   <section class="card">
     <div class="sectionhd"><span class="num">R</span><h2>Generador de reporte de calibración</h2></div>
-    <p class="hint" style="margin-top:0">Al <b>procesar el pegado o el Excel</b> en la pestaña <b>Notificaciones</b>, se generan automáticamente los reportes de calibración de los instrumentos que estén en la base (los que no estén, se omiten). Elige un instrumento en la lista para revisar y editar su reporte. También puedes buscar un TAG suelto. Solo ingresas los <b>valores de calibración</b> (Enc./Dejado); lo demás se autollena. <b>Generar reporte</b> imprime el PDF; <b>Grabar a la base de datos</b> descarga un solo JSON con TODOS los instrumentos para actualizar la base.</p>
+    <p class="hint" style="margin-top:0">Al <b>procesar el pegado o el Excel</b> en la pestaña <b>Notificaciones</b>, se generan automáticamente los reportes de calibración de los instrumentos que estén en la base (los que no estén, se omiten). Elige un instrumento en la lista para revisar y editar su reporte. También puedes buscar un TAG suelto. Solo ingresas los <b>valores de calibración</b> (Enc./Dejado); lo demás se autollena. <b>Generar reporte</b> imprime el PDF; <b>Grabar a la base de datos</b> graba TODOS los instrumentos: actualiza en línea la base .mdb que elijas de tu PC (y la descargas), o descarga el JSON para grabar.bat.</p>
     <div class="selectbar">
       <label for="repSelect">Instrumentos cargados (reportes)</label>
       <select id="repSelect"><option value="">— Ninguno cargado (procesa datos en Notificaciones o busca un TAG) —</option></select>
@@ -375,6 +387,40 @@
     <div class="tbl-wrap"><div id="admList"></div></div>
   </section>
 </div><!-- /panel-admin -->
+
+<div id="dbModal" class="modalbg" hidden role="dialog" aria-modal="true" aria-labelledby="dbTitle">
+  <section class="card modalcard">
+    <div class="sectionhd">
+      <span class="num">DB</span>
+      <h2 id="dbTitle">Grabar a la base de datos</h2>
+      <span class="grow"></span>
+      <button id="dbCerrar" class="btn ghost" style="margin-top:0">Cerrar</button>
+    </div>
+    <p id="dbResumen" class="hint" style="margin-top:0"></p>
+
+    <h3>Opción 1 · Actualizar la base aquí mismo</h3>
+    <p class="hint" style="margin-top:0">Elige la base <b>editable</b> de DPCTrack2 (.mdb) que tengas en este PC. Se actualiza <b>dentro del navegador</b> con las mismas reglas que <b>grabar.bat</b> (calibración + especificación + contador de IDs), se verifica, y al final la <b>descargas</b> para llevarla a DPCTrack. La base no se envía a ningún servidor y el archivo original de tu PC no se modifica.</p>
+    <div class="dbrow">
+      <label class="btn filelbl">Elegir base .mdb<input type="file" id="dbFile" accept=".mdb" hidden></label>
+      <span id="dbFileName" class="cloudst dbfile">Ninguna base elegida</span>
+    </div>
+    <div class="dbrow">
+      <button id="dbProcesar" class="btn primary" disabled>Grabar en la base</button>
+    </div>
+    <div id="dbEstado" class="dbst" aria-live="polite"></div>
+    <pre id="dbLog" class="dblog" hidden></pre>
+    <div id="dbDescargaRow" class="dbrow" hidden>
+      <button id="dbDescargar" class="btn primary">Descargar base actualizada</button>
+      <span id="dbDescargaInfo" class="cloudst dbfile"></span>
+    </div>
+
+    <h3>Opción 2 · Descargar el JSON (para grabar.bat)</h3>
+    <p class="hint" style="margin-top:0">El flujo de siempre: descarga el JSON con todos los instrumentos y arrástralo sobre <b>grabar.bat</b> junto con la base editable.</p>
+    <div class="dbrow">
+      <button id="dbJson" class="btn">Descargar JSON</button>
+    </div>
+  </section>
+</div>
 
 <footer>Funciona en tu navegador · Los reportes se guardan en tu cuenta (Supabase) · Sin conexión puedes generar .txt/PDF; guardar requiere internet · <span title="Fecha de compilación. Si no coincide con la última, recarga con Ctrl+Shift+R.">versión <!--BUILD--></span></footer>
 </div>

@@ -1,0 +1,51 @@
+--- a/com/healthmarketscience/jackcess/impl/IndexPageCache.java
++++ b/com/healthmarketscience/jackcess/impl/IndexPageCache.java
+@@ -539,6 +539,16 @@
+               "unknown update type " + upType));
+     }
+ 
++    if((idx < 0) && expectFound) {
++      // PARCHE (Notificaciones de Trabajo): Access/Jet no siempre reescribe la
++      // entrada del nodo padre cuando cambia la última entrada de una página
++      // hija; la deja como cota superior (clave/rowId de una fila ya borrada).
++      // Esa página sigue siendo un árbol B válido (la navegación usa el punto
++      // de inserción), pero la búsqueda exacta falla. En ese caso se localiza
++      // la entrada del padre por el número de la página hija (único por padre).
++      idx = findEntryBySubPage(parentExtra, childMain._pageNumber);
++    }
++
+     if(idx < 0) {
+       if(expectFound) {
+         throw new IllegalStateException(withErrorContext(
+@@ -563,6 +573,31 @@
+   }
+ 
+   /**
++   * PARCHE: índice de la (única) entrada del padre que apunta a la página
++   * hija dada, o -1 si no hay exactamente una.
++   */
++  private static int findEntryBySubPage(DataPageExtra parentExtra,
++                                        Integer childPageNumber)
++  {
++    int found = -1;
++    int size = parentExtra._entryView.size();
++    for(int i = 0; i < size; ++i) {
++      Entry e = parentExtra._entryView.get(i);
++      if(e.isLeafEntry()) {
++        return -1;
++      }
++      Integer sub = e.getSubPageNumber();
++      if((sub != null) && sub.equals(childPageNumber)) {
++        if(found >= 0) {
++          return -1;
++        }
++        found = i;
++      }
++    }
++    return found;
++  }
++
++  /**
+    * Updates the child tail info in the given parent page according to the
+    * given updateType.
+    *

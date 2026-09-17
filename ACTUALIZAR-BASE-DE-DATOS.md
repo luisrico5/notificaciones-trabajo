@@ -3,10 +3,51 @@
 Guía para **grabar en la base de datos** las calibraciones generadas en el dashboard, de modo que
 **DPCTrack2** las lea y produzca el reporte idéntico.
 
-> ⚠️ El navegador **no puede** escribir el `.mdb` (Access cifrado, sin servidor). Por eso el botón del
-> dashboard **descarga un JSON** y un script de PowerShell lo inserta en la base. Es un proceso de 2 pasos.
+Al pulsar **"Grabar a la base de datos"** (pestaña *Reporte de calibración*) se abre un diálogo con **dos
+opciones que dejan la base exactamente igual**:
+
+- **Opción 1 · Actualizar la base aquí mismo (en línea):** eliges la base editable `.mdb` del PC donde estés,
+  la página la actualiza dentro del navegador y la descargas lista para DPCTrack. No hace falta PowerShell,
+  `grabar.bat` ni la clave.
+- **Opción 2 · Descargar el JSON (para grabar.bat):** el flujo de siempre, descrito más abajo.
 
 ---
+
+## Opción 1 · Actualizar la base en línea (desde la página)
+
+1. Pulsa **"Grabar a la base de datos"**. El diálogo muestra cuántos instrumentos se van a grabar.
+2. **Elegir base .mdb** → selecciona la base **editable** de DPCTrack2 de ese PC.
+3. **Grabar en la base** → la página graba todo (tarda unos segundos; la página sigue respondiendo). Al terminar
+   muestra el mismo resumen que `grabar.bat` (`OK <tag> -> CalibrationID=…`, `spec actualizada…`,
+   `OMITIDO …`) y la línea **"Verificación: OK"**.
+4. **Descargar base actualizada** → se descarga con **el mismo nombre** que la que elegiste (normalmente en
+   *Descargas*). Llévala a la carpeta de DPCTrack **reemplazando la anterior** (guarda una copia de la anterior
+   si quieres poder volver atrás) y ábrela en DPCTrack2.
+
+Cómo funciona y por qué es seguro:
+
+- **Misma lógica que `grabar.bat`:** la página arma **el mismo JSON** que descarga la Opción 2 y lo graba con
+  un port de `src\grabar_reporte.ps1` (plantilla = última calibración, `CALIBRAT`/`CalGroups`/`CALDET`/
+  `CALTEST`/`PCNotes`, **especificación** `InstSpecGroup`+`INSTSPEC` y contador **`IDs`**). Se probó grabando
+  los mismos JSON reales con ambos caminos: las 8 tablas quedan **idénticas fila por fila**.
+- **Nada sale del PC:** la base se lee y se escribe **en la memoria del navegador**; no se sube a ningún servidor
+  (ni a Supabase). El archivo original del PC **no se modifica**: lo que descargas es una copia actualizada.
+- **Autoverificación:** antes de ofrecer la descarga, la página reabre la base grabada y comprueba conteos de filas,
+  todos los índices de las tablas tocadas y que cada calibración nueva esté completa. Si algo no cuadra, **no ofrece
+  la descarga** y dice "No se grabó nada".
+- **La contraseña de la base se conserva** (no se necesita para grabar y la base sigue pidiéndola).
+- **Nunca sobre la _backup:** si el nombre del archivo contiene "backup", la página se niega (igual que `grabar.bat`).
+- Si un instrumento no tiene calibración previa en esa base, se **omite con aviso** (igual que el script). Si se
+  omiten todos, no se ofrece descarga porque no hubo cambios.
+- Requiere un navegador de escritorio actualizado (Chrome/Edge). Funciona desde GitHub Pages y abriendo
+  `index.html` local. Si algo falla, usa la Opción 2.
+
+---
+
+## Opción 2 · JSON + grabar.bat / PowerShell
+
+> El botón **descarga un JSON** y un script de PowerShell lo inserta en la base (con el motor de Access del PC).
+> Es un proceso de 2 pasos. Es el flujo original y sigue disponible sin cambios.
 
 ## Resumen del flujo
 
@@ -118,5 +159,11 @@ Dashboard (pestaña Reporte)                     PowerShell                     
 
 ---
 
-*Referencia rápida:* botón que genera el JSON = **"Grabar a la base de datos"** (pestaña *Reporte de
-calibración*). Script que lo inserta = **`src\grabar_reporte.ps1`**.
+| En la página: `No se grabó nada. … parece la _backup` | Elegiste la base de solo consulta. Elige la base **editable**. |
+| En la página: `No se grabó nada. <mensaje>` | La base no se pudo abrir/grabar/verificar (archivo que no es de DPCTrack2, dañado, o memoria insuficiente). La base original no cambió; usa la Opción 2. |
+
+---
+
+*Referencia rápida:* botón = **"Grabar a la base de datos"** (pestaña *Reporte de calibración*). Opción 1 =
+grabado en línea (`src\grabar_mdb.js`, generado desde `mdbwriter/`). Opción 2 = JSON que inserta
+**`src\grabar_reporte.ps1`** (vía `grabar.bat`).

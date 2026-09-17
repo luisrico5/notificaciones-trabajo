@@ -17,3 +17,8 @@ grabar_*.json
 # Supabase: variables de entorno locales y temporales de la CLI (la anon key es publica; la service_role NUNCA va al repo).
 .env*
 supabase/.temp/
+
+# Escritor de la base para el navegador (mdbwriter/): descargas de Maven Central y compilados. Se regeneran con
+# bash mdbwriter/build.sh (el resultado versionado es src/grabar_mdb.js).
+mdbwriter/work/
+mdbwriter/app/target/

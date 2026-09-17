@@ -7,5 +7,7 @@ cat "$DIR/src/part_head.html" "$DIR/src/xlsx.full.min.js" > "$DIR/index.html"
 printf '\n' >> "$DIR/index.html"
 cat "$DIR/src/html2pdf.bundle.min.js" >> "$DIR/index.html"
 printf '\n' >> "$DIR/index.html"
+cat "$DIR/src/grabar_mdb.js" >> "$DIR/index.html"   # escritor de la base .mdb (generado por mdbwriter/build.sh)
+printf '\n' >> "$DIR/index.html"
 cat "$DIR/src/part_tail.html" >> "$DIR/index.html"
 echo "index.html generado ($(wc -c < "$DIR/index.html") bytes)"

@@ -96,9 +96,11 @@ y editarlos uno por uno.
 *Guardar todos en mi cuenta* sube todo el lote. Los campos **Quién realizó la calibración** y **Finalizado
 por** se autollenan con el usuario con sesión (editables). Lo guardado se reabre desde **Mis reportes**.
 
-**Grabar a la base de datos:** el botón **descarga un JSON** con todos los instrumentos para meterlos a la
-base editable y que DPCTrack los lea igual. El paso a paso está en
-**[ACTUALIZAR-BASE-DE-DATOS.md](ACTUALIZAR-BASE-DE-DATOS.md)**.
+**Grabar a la base de datos:** el botón abre un diálogo con dos opciones que dejan la base igual:
+**(1) actualizar la base en línea** (eliges la base editable `.mdb` del PC donde estés, la página la graba y
+verifica dentro del navegador, sin enviarla a ningún servidor, y la **descargas** para llevarla a DPCTrack) o
+**(2) descargar el JSON** con todos los instrumentos para `grabar.bat` (el flujo de siempre). El paso a paso
+está en **[ACTUALIZAR-BASE-DE-DATOS.md](ACTUALIZAR-BASE-DE-DATOS.md)**.
 
 ## Mapeo TAG → Procedimiento
 El mapeo ya viene **pre-cargado** con los procedimientos P-SG y sus puntos clave, extraídos de los
@@ -202,15 +204,18 @@ src/
   part_head.html      <head> + CSS + interfaz (HTML).
   part_tail.html      Toda la lógica (JS): mapeo TAG→procedimiento (DEFAULT_MAP_ARR) y datos TAG_RANGES.
   xlsx.full.min.js    Librería de Excel incrustada (no se toca).
+  grabar_mdb.js       Escritor de la base .mdb para "Grabar a la base de datos" en línea. GENERADO por mdbwriter/build.sh.
+  grabar_reporte.ps1  Graba el JSON del botón en la base editable (lo usa grabar.bat).
   build_config.py     Regenera el mapeo desde src/answers/ (resúmenes de NotebookLM).
   extract_ranges.ps1  Lee la base .mdb y vuelca rango/salida/patrones/técnico/indicación por TAG.
   answers/            Resúmenes de cada procedimiento P-SG (fuente del mapeo).
 datos_calibracion.json   Datos de calibración portables (para adjuntar en la app). Generado.
 supabase/schema.sql   Esquema de cuentas y reportes (tablas, trigger de perfil, RLS). Se pega en Supabase. Sin secretos.
+mdbwriter/            Fuentes del escritor en línea: port de grabar_reporte.ps1 (Java) + Jackcess parcheado → JavaScript (TeaVM).
 20260810_dpctrack2_backup.mdb   Base DPCTrack2 (con contraseña). NO publicar.
 zzz/                Binarios del programa DPCTrack2 (referencia). NO publicar.
 ```
-`index.html` se arma juntando `part_head.html` + `xlsx.full.min.js` + `html2pdf.bundle.min.js` + `part_tail.html`.
+`index.html` se arma juntando `part_head.html` + `xlsx.full.min.js` + `html2pdf.bundle.min.js` + `grabar_mdb.js` + `part_tail.html`.
 
 ## Cómo hacer cambios (ahora y a futuro)
 **Regla de oro:** edita en `src/` y reconstruye. No edites `index.html` directamente (se sobrescribe y la
@@ -238,6 +243,9 @@ Cambios típicos:
 - **Actualizar los datos de calibración** (rango/salida/patrones/técnico/indicación): ejecuta
   `src/extract_ranges.ps1` sobre la base nueva y **adjunta** el `datos_calibracion.json` en la app, o
   reconstruye para incrustarlos. Ver la sección *Base de calibración*.
+- **Cambiar cómo se graba la base** → cambia **los dos caminos juntos**: `src/grabar_reporte.ps1` (grabar.bat) y
+  su port `mdbwriter/app/.../GrabarMdb.java` (en línea); luego `bash mdbwriter/build.sh` (regenera
+  `src/grabar_mdb.js`), `build.ps1`, y la prueba de fidelidad `mdbwriter/test/run_case.sh`. Ver `mdbwriter/README.md`.
 
 > Detalles de arquitectura, funciones clave y cómo verificar sin navegador: ver **`CLAUDE.md`**.
 
@@ -245,8 +253,8 @@ Cambios típicos:
 El sitio está publicado en **https://luisrico5.github.io/notificaciones-trabajo/** (repo
 `luisrico5/notificaciones-trabajo`, *Settings → Pages → Deploy from branch → main / root*). Cada `git push`
 a `main` actualiza la página en un momento.
-- Se suben `index.html`, `README.md`, `CLAUDE.md`, `src/`, `build.*`, `supabase/schema.sql` y
-  `datos_calibracion.json`. **No subas** la base `*.mdb`, la carpeta `zzz/`, los `grabar_*.json`, el
+- Se suben `index.html`, `README.md`, `CLAUDE.md`, `src/`, `build.*`, `supabase/schema.sql`, `mdbwriter/`
+  (sin `work/` ni `app/target/`) y `datos_calibracion.json`. **No subas** la base `*.mdb`, la carpeta `zzz/`, los `grabar_*.json`, el
   `grabar.bat` ni la contraseña de la base: el `.gitignore` ya los excluye.
 - `SB_URL` y `SB_ANON_KEY` (la **anon key** pública de Supabase) sí van en `src/part_tail.html`: es lo
   previsto, los datos los protege RLS. La **`service_role` key nunca** va en la app ni en el repo.
