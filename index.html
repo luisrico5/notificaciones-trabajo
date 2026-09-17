@@ -376,7 +376,7 @@
   </section>
 </div><!-- /panel-admin -->
 
-<footer>Funciona en tu navegador · Los reportes se guardan en tu cuenta (Supabase) · Sin conexión puedes generar .txt/PDF; guardar requiere internet · <span title="Fecha de compilación. Si no coincide con la última, recarga con Ctrl+Shift+R.">versión 2026-09-16 18:44</span></footer>
+<footer>Funciona en tu navegador · Los reportes se guardan en tu cuenta (Supabase) · Sin conexión puedes generar .txt/PDF; guardar requiere internet · <span title="Fecha de compilación. Si no coincide con la última, recarga con Ctrl+Shift+R.">versión 2026-09-16 19:24</span></footer>
 </div>
 <div id="reportPrint" aria-hidden="true"></div>
 <div id="authGate">
@@ -973,8 +973,8 @@ var uid=0;
 /* ---------- Cuenta de usuario (Supabase) — configuración PÚBLICA ----------
    SB_URL y SB_ANON_KEY se copian de Supabase → Project Settings → API. La "anon key" es pública por diseño
    (los datos los protege RLS en el servidor; ver supabase/schema.sql). NUNCA poner aquí la "service_role". */
-var SB_URL="https://TU-PROYECTO.supabase.co";
-var SB_ANON_KEY="PEGA_AQUI_LA_ANON_KEY";
+var SB_URL="https://puaegncolaokwpmhvrco.supabase.co";
+var SB_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB1YWVnbmNvbGFva3dwbWh2cmNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1OTU1NjMsImV4cCI6MjEwNTE3MTU2M30.zwlmvyyW6EIF1sDEnM1CV1hFxOAyNQ_Bawg4YiTjbm8";
 var AUTH_KEY="noti_auth_v1";       // sesión cacheada: {v,tokens:{access,refresh,expiresAt},user:{id,email},profile:{…},checked_at}
 var PENDING_KEY="noti_pending_v1"; // cola de reportes por subir (sin conexión / servidor caído)
 var CURRENT_USER=null;             // {id,email,name,role,approved} | null (lo fija auth.setUser)
