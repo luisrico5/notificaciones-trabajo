@@ -69,9 +69,10 @@ Siempre sobre **copias** de la base editable, nunca la `_backup`. La clave va po
   (`dump_fast.ps1`); luego exige que el JavaScript sea **idéntico byte a byte** a la JVM (`node_test.js`) y valida los
   índices con DAO (`verify_index.ps1`).
 - `test/EquivTest.java`: Jackcess parcheado original vs reescrito para el navegador, idénticos byte a byte.
-- `test/e2e_navegador.js <index.html> <copia.mdb> <carpeta>`: Chrome real (headless): abre el diálogo, rechaza la
-  `_backup`, graba con Web Worker, descarga la base y el JSON, comprueba que el original no cambió, que el resto de la
-  pestaña sigue funcionando y que también funciona abriendo `index.html` como archivo local.
+- `test/e2e_navegador.js <index.html | URL publicada> <copia.mdb> <carpeta>`: Chrome real (headless): abre el
+  diálogo, rechaza la `_backup`, graba con Web Worker, descarga la base y el JSON, comprueba que el original no cambió,
+  que el resto de la pestaña sigue funcionando y (con ruta local) que también funciona abriendo `index.html` como
+  archivo. Con la URL de GitHub Pages prueba la página publicada.
 
 Resultados al incorporarlo (base del 2026-09-08): JSON reales del 18-ago (15 instrumentos) y del 08-sep
 (9 instrumentos, 1 omitido), casos borde y el lote del navegador → **idénticos** a `grabar_reporte.ps1`/`grabar.bat`;

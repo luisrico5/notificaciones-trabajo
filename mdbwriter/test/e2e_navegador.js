@@ -1,5 +1,5 @@
 // Prueba de punta a punta en Chrome REAL (headless, protocolo DevTools) del botón "Grabar a la base de datos".
-// Uso: node mdbwriter/test/e2e_navegador.js <ruta absoluta a index.html> <COPIA de la base editable .mdb> <carpeta_trabajo>
+// Uso: node mdbwriter/test/e2e_navegador.js <ruta absoluta a index.html | URL publicada> <COPIA de la base editable .mdb> <carpeta_trabajo>
 // Requiere Google Chrome. Bloquea la red a Supabase y entra con una sesión cacheada de prueba (no toca la nube).
 "use strict";
 const fs = require("fs"), path = require("path"), http = require("http"), os = require("os");
@@ -19,7 +19,8 @@ function rmrf(d) { fs.rmSync(d, { recursive: true, force: true }); }
 rmrf(DL); rmrf(UP); fs.mkdirSync(DL, { recursive: true }); fs.mkdirSync(UP, { recursive: true });
 
 // ---- servidor estático (como GitHub Pages) ----
-const html = fs.readFileSync(INDEX);
+const REMOTA = /^https?:\/\//i.test(INDEX);   // p. ej. la página publicada en GitHub Pages (se omite la prueba file://)
+const html = REMOTA ? "" : fs.readFileSync(INDEX);
 const server = http.createServer((req, res) => { res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" }); res.end(html); });
 
 // ---- CDP mínimo ----
@@ -36,7 +37,7 @@ class CDP {
 
 async function main() {
   await new Promise(r => server.listen(0, "127.0.0.1", r));
-  const URLH = "http://127.0.0.1:" + server.address().port + "/index.html";
+  const URLH = REMOTA ? INDEX : "http://127.0.0.1:" + server.address().port + "/index.html";
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), "e2e-chrome-"));
   const chrome = spawn(CHROME, ["--headless=new", "--remote-debugging-port=0", "--user-data-dir=" + profile, "--no-first-run",
     "--no-default-browser-check", "--disable-extensions", "--allow-file-access-from-files", "about:blank"], { stdio: "ignore" });
@@ -168,6 +169,7 @@ async function main() {
   const pdf = await esperarDescarga("LT-R161.pdf", 90000).catch(e => null);
   ok(pdf && fs.statSync(pdf).size > 10000, "'Descargar reporte (PDF)' sigue descargando el PDF");
 
+  if (!REMOTA) {
   console.log("\n[7] index.html abierto como archivo local (file://)");
   const F = await nuevaPagina("file:///" + INDEX.replace(/\\/g, "/"), "file");
   await F.ev("switchTab('reporte'); document.getElementById('repTag').value='TIT-DR719'; document.getElementById('repBuscar').click(); document.getElementById('repGrabar').click(); true");
@@ -178,6 +180,7 @@ async function main() {
   await F.ev("document.getElementById('dbProcesar').click(); true");
   await F.esperar("!document.getElementById('dbDescargaRow').hidden || document.getElementById('dbEstado').classList.contains('err')", 240000, "grabado file://");
   ok(await F.ev("!document.getElementById('dbDescargaRow').hidden"), "también graba abriendo index.html local (" + (workers.length > w2 ? "Web Worker" : "hilo principal") + "): " + await F.ev("document.getElementById('dbEstado').textContent"));
+  }
 
   ok(errores.length === 0, "sin errores de JavaScript en consola" + (errores.length ? ": " + errores.join(" | ") : ""));
   fs.writeFileSync(path.join(WORK, "resultado_browser.json"), JSON.stringify({ mdb: mdbOut, json: jsonOut }));
