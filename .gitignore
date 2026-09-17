@@ -22,3 +22,6 @@ supabase/.temp/
 # bash mdbwriter/build.sh (el resultado versionado es src/grabar_mdb.js).
 mdbwriter/work/
 mdbwriter/app/target/
+
+# Pruebas Node de la app: copia del JavaScript extraída de index.html (se regenera al correrlas)
+mdbwriter/test/app/app_check.js

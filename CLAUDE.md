@@ -135,9 +135,25 @@ está en medio y el archivo se regenera).
   calibración"): `src/extract_ranges.ps1` también genera `datos_calibracion.json`; el usuario lo adjunta
   en el dashboard (input `importCalib`), se guarda en `localStorage` y **manda sobre los datos
   incrustados** (para TAG que no incluya, cae a `TAG_RANGES`). "Volver a incrustados" = `btnCalibReset`.
-  El navegador **no** abre el `.mdb` directo (Access cifrado); por eso el puente es el `.json`.
   Regenerar: `powershell -File src\extract_ranges.ps1 -Mdb <base_nueva> -Password "<clave>"` (clave en
   `zzz\PasswordReset.exe`, por defecto de DPCTrack2) → adjuntar el `.json` **o** `build.ps1` para incrustar.
+- **Datos de calibración desde la base, compartidos en la nube** (módulo `datosCal`): el MISMO contenido que
+  `extract_ranges.ps1` lo produce en el navegador `api.extraer(generado, nombre)` (port Java
+  `mdbwriter/app/.../Extractor.java`, **contenido idéntico** a PS verificado con `mdbwriter/test/comparar_datos.js`
+  en 3 bases) y va a `CAL_OVERRIDE` con `base:{nombre, ultimoId=MAX(CalibrationID), ultimaFecha}`, `generado`,
+  `origen` ("base"|"nube") y `pendienteNube`. Entradas: (1) tras grabar en línea, `mdbwEjecutar` extrae de la base YA
+  actualizada (`out.datos`) y `dbGrabar` llama `datosCal.actualizarDesdeBase` (estado en `#dbDatosEstado`); (2) tarjeta
+  02 **"Actualizar desde base .mdb"** (`#importBase`, `mdbwCorrer({tipo:"extraer"})`, estado `#calBaseEstado`; solo
+  lectura, admite cualquier base). **Nunca retrocede**: si `base.ultimoId` < el vigente no aplica. Aplica local
+  (`refreshAll` + `renderRepTecnicos`; regenera `REP_BATCH` solo si `REP_BATCH_EDITADO` es false, si no avisa en
+  `#repMsg`) y comparte UN archivo `datos_calibracion.json.gz` en el bucket `respaldo-base` (x-upsert; si la nube ya
+  tiene una base más nueva aplica la de la nube). `sincronizar()` (2,5 s tras `bootApp` y al volver `online`): sube lo
+  `pendienteNube` o baja de la nube si cambió (`noti_calib_nube_v1` guarda la última versión vista) y no es más
+  vieja. `respaldoNube.limpiarOtros` conserva ese archivo. `REP_BATCH_EDITADO` se pone en true al editar el formulario
+  (listeners de captura), buscar/agregar, abrir de Mis reportes o aplicar técnico; false en `buildRepBatch`/"Vaciar".
+  **Si cambias `extract_ranges.ps1`, cambia también `Extractor.java`** y compara (`ExtraerCli`/`node_extraer.js` vs PS).
+  Rendimiento en JS (~7 s para 81 MB): evitar `String.toLowerCase(Locale)`, `String.replace(CharSequence)`,
+  `BigDecimal` y `Double.toString` en bucles (en TeaVM son órdenes de magnitud más lentos; ver `ci`, `redondear`, `Json.Num`).
 - **Pestaña "Reporte de calibración"** (`TAG_REPORT` + funciones `rep*` + área `#reportPrint`): la app tiene
   dos pestañas arriba — **Notificaciones** (todo lo anterior) y **Reporte de calibración**, un generador que
   **replica el informe de DPCTrack** ("INSTRUMENTO INFORME DE CALIBRACIÓN") en PDF. El técnico digita un TAG,
@@ -420,7 +436,9 @@ Tableros: **notificaciones** `4b85f680-9773-4929-9d77-f9cbce5fcef1` y **notifica
 ## Verificación (sin navegador)
 Desde el login, el stub debe proveer `localStorage`, `sessionStorage`, `navigator.onLine`, `location.reload`,
 `window.addEventListener` y un `fetch` simulado (`auth.init` corre al cargar; sin caché de sesión NO llama a
-la red). El arnés `e2e_auth.js` (scratchpad) cubre: gate sin caché, arranque con caché, autollenado,
+la red). **`node mdbwriter/test/app/correr.js`** extrae el JS de `index.html` y corre `e2e_auth.js`, `e2e_nube_node.js`
+(respaldo en la nube: `sb.req` binario, reintentos, 403, gzip, huella) y `e2e_datos_node.js` (datos compartidos: no
+retroceder, publicar, nube más nueva, pendiente sin red, sincronizar, lote editado). El arnés `e2e_auth.js` cubre: gate sin caché, arranque con caché, autollenado,
 round-trip calibración/notificación, wrapper `sb` (errores legibles, 401→refresh→reintento, offline,
 refresco proactivo, upsert), cola offline, pendiente/revocado/sesión inválida, offline con caché y `owner`.
 El JS de la app se extrae de `index.html` (2º `<script>`) y se prueba con Node + stub de DOM en el

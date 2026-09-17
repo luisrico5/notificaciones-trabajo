@@ -629,44 +629,66 @@ public final class GrabarMdb {
   // ======================================================================================================
 
   static String q(String s) {
-    StringBuilder sb = new StringBuilder("\"");
-    for (int i = 0; i < s.length(); i++) {
+    StringBuilder sb = new StringBuilder(s.length() + 2);
+    q(sb, s);
+    return sb.toString();
+  }
+
+  /** Escribe la cadena JSON en sb. Los tramos sin caracteres a escapar se copian de una vez (rápido en TeaVM). */
+  static void q(StringBuilder sb, String s) {
+    sb.append('"');
+    int n = s.length(), desde = 0;
+    for (int i = 0; i < n; i++) {
       char c = s.charAt(i);
+      if (c >= 0x20 && c != '"' && c != '\\') continue;
+      if (i > desde) sb.append(s, desde, i);
+      desde = i + 1;
       switch (c) {
         case '"': sb.append("\\\""); break;
         case '\\': sb.append("\\\\"); break;
         case '\n': sb.append("\\n"); break;
         case '\r': sb.append("\\r"); break;
         case '\t': sb.append("\\t"); break;
-        default:
-          if (c < 0x20) { String h = Integer.toHexString(c); sb.append("\\u"); for (int k = h.length(); k < 4; k++) sb.append('0'); sb.append(h); }
-          else sb.append(c);
+        default: { String h = Integer.toHexString(c); sb.append("\\u"); for (int k = h.length(); k < 4; k++) sb.append('0'); sb.append(h); }
       }
     }
-    return sb.append('"').toString();
+    if (n > desde) sb.append(s, desde, n);
+    sb.append('"');
   }
 
   static String toJson(Object v) {
-    if (v == null) return "null";
-    if (v instanceof String) return q((String) v);
-    if (v instanceof Number || v instanceof Boolean) return String.valueOf(v);
+    StringBuilder sb = new StringBuilder();
+    toJson(sb, v);
+    return sb.toString();
+  }
+
+  /** Mismo resultado que antes, pero escribiendo todo en un único StringBuilder (sin cadenas intermedias). */
+  static void toJson(StringBuilder sb, Object v) {
+    if (v == null) { sb.append("null"); return; }
+    if (v instanceof String) { q(sb, (String) v); return; }
+    if (v instanceof Number || v instanceof Boolean) { sb.append(String.valueOf(v)); return; }
+    if (v instanceof Json.Num) { sb.append(((Json.Num) v).text); return; }
     if (v instanceof Map) {
-      StringBuilder sb = new StringBuilder("{");
+      sb.append('{');
       boolean first = true;
       for (Map.Entry<?, ?> e : ((Map<?, ?>) v).entrySet()) {
         if (!first) sb.append(',');
         first = false;
-        sb.append(q(String.valueOf(e.getKey()))).append(':').append(toJson(e.getValue()));
+        q(sb, String.valueOf(e.getKey()));
+        sb.append(':');
+        toJson(sb, e.getValue());
       }
-      return sb.append('}').toString();
+      sb.append('}');
+      return;
     }
     if (v instanceof List) {
-      StringBuilder sb = new StringBuilder("[");
+      sb.append('[');
       boolean first = true;
-      for (Object o : (List<?>) v) { if (!first) sb.append(','); first = false; sb.append(toJson(o)); }
-      return sb.append(']').toString();
+      for (Object o : (List<?>) v) { if (!first) sb.append(','); first = false; toJson(sb, o); }
+      sb.append(']');
+      return;
     }
-    return q(String.valueOf(v));
+    q(sb, String.valueOf(v));
   }
 
   public static String resultadoJson(Resultado r) {

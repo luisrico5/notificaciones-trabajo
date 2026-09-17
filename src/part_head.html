@@ -301,8 +301,10 @@
     <button id="btnReset" class="btn ghost danger">Restablecer a valores por defecto</button>
 
     <h3 style="margin-top:22px">Base de calibración (rangos, salidas y patrones)</h3>
-    <p class="hint" style="margin-top:0">Los datos de <b>rango</b>, <b>salida</b> y <b>patrones utilizados</b> salen de la base DPCTrack2. Para actualizarlos a futuro, genera el archivo <code>datos_calibracion.json</code> con <code>src/extract_ranges.ps1</code> sobre la base nueva y adjúntalo aquí; se guarda en este navegador y se aplica a las órdenes cargadas. (El navegador no puede abrir el <code>.mdb</code> directamente, por eso se usa el archivo de datos.)</p>
+    <p class="hint" style="margin-top:0">Los datos de <b>rango</b>, <b>salida</b>, <b>patrones</b>, <b>técnico</b> y los <b>reportes que se abren por defecto</b> salen de la base DPCTrack2. Se actualizan solos <b>cada vez que alguien graba en línea</b> y se comparten con todos los usuarios. Para actualizarlos sin grabar (por ejemplo, si se calibró directo en DPCTrack), usa <b>Actualizar desde base .mdb</b>: solo se leen los datos, la base no se modifica. Nunca se reemplazan por los de una base más vieja.</p>
     <div id="calStatus" class="hint" style="margin-top:0"></div>
+    <label class="btn filelbl">Actualizar desde base .mdb<input type="file" id="importBase" accept=".mdb" hidden></label>
+    <div id="calBaseEstado" class="dbst" aria-live="polite"></div>
     <label class="btn ghost filelbl">Adjuntar datos_calibracion.json<input type="file" id="importCalib" accept=".json,application/json" hidden></label>
     <button id="btnCalibReset" class="btn ghost danger">Volver a los datos incrustados</button>
   </section>
@@ -417,6 +419,7 @@
       <button id="dbNubeReintentar" class="btn">Reintentar respaldo</button>
       <button id="dbOriginal" class="btn">Descargar base original</button>
     </div>
+    <div id="dbDatosEstado" class="dbst" aria-live="polite"></div>
 
     <h3>Opción 2 · Descargar el JSON (para grabar.bat)</h3>
     <p class="hint" style="margin-top:0">El flujo de siempre: descarga el JSON con todos los instrumentos y arrástralo sobre <b>grabar.bat</b> junto con la base editable.</p>

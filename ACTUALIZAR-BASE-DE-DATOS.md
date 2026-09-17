@@ -27,6 +27,11 @@ opciones que dejan la base exactamente igual**:
    respaldo) **y la actualizada**.
 5. **Descargar base actualizada** → se descarga con **el mismo nombre** que la que elegiste (normalmente en
    *Descargas*). Llévala a la carpeta de DPCTrack **reemplazando la anterior** y ábrela en DPCTrack2.
+6. **Reportes por defecto al día** → además, la página lee de la base **ya actualizada** los datos con que se
+   autollenan las notificaciones y los reportes al poner una orden o un TAG (rangos, patrones, técnico, puntos,
+   notas…) y los **comparte con todos los usuarios**. El diálogo lo confirma con *"Reportes por defecto actualizados…
+   y compartidos"*. Si la base que grabaste es más vieja que los datos vigentes, no se reemplazan y se avisa.
+   (También puedes hacerlo sin grabar: tarjeta 02 → **Actualizar desde base .mdb**.)
 
 ### Respaldo en la nube (la base original)
 

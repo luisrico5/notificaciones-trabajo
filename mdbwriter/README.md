@@ -32,6 +32,16 @@ LICENSE-APACHE-2.0.txt        Licencia de Jackcess y TeaVM (Apache 2.0).
 work/, app/target/            Descargas y compilados (ignorados por git).
 ```
 
+## Datos de calibración (Extractor)
+`Extractor.java` es el port de `src/extract_ranges.ps1`: lee la base (solo lectura) y devuelve el mismo contenido que
+`datos_calibracion.json` (`tags`, `reportes`, `patrones`, `tecnicos`) más `base:{nombre, ultimoId, ultimaFecha}`.
+La página lo usa tras grabar en línea y con "Actualizar desde base .mdb" (tarjeta 02) para mantener actualizados y
+compartidos los reportes por defecto. Replica claves sin mayúsculas, `Trim()` de .NET, los formatos numéricos "0.####"
+(es-ES) y "0.######" y el orden de `Sort-Object` cuando dos TAG se normalizan igual (p. ej. `PT--RF189`/`PT-RF189`).
+Comparación: `java grabarmdb.ExtraerCli base.mdb java.json` o `node test/node_extraer.js ../src/grabar_mdb.js base.mdb js.json`,
+y `node test/comparar_datos.js datos_calibracion.json js.json` contra la salida de `extract_ranges.ps1` sobre la misma
+base (correr el script sobre una COPIA de `src/` para no reescribir `part_tail.html`).
+
 ## Construir
 ```
 bash mdbwriter/build.sh                                   # Git Bash (Windows) o bash

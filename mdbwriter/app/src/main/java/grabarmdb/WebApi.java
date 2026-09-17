@@ -11,6 +11,7 @@ import org.teavm.jso.typedarrays.Int8Array;
 /**
  * API exportada a JavaScript (TeaVM). La página la usa así, dentro de un Web Worker:
  *   nuevaBase(); agregarBytes(parte) por trozos; grabar(json, ahora, spec, nombre) -> JSON de resultado;
+ *   extraer(generado, nombre) -> datos de calibración (formato datos_calibracion.json);
  *   tamano() + leerBytes(pos, len) por trozos para armar el .mdb descargable; liberar().
  * Todo ocurre en memoria: el archivo original del PC nunca se modifica.
  */
@@ -43,6 +44,20 @@ public class WebApi {
       return GrabarMdb.resultadoJson(r);
     } catch (Throwable t) {
       canal = null;
+      return GrabarMdb.errorJson(t);
+    }
+  }
+
+  /**
+   * Lee de la base cargada (o recién grabada) los datos con que la app autollena notificaciones y reportes, con el
+   * formato de datos_calibracion.json (port de src/extract_ranges.ps1). Devuelve ese JSON, o {"ok":false,...}.
+   */
+  @JSExport
+  public static String extraer(String generado, String nombreBase) {
+    try {
+      if (canal == null) throw new IllegalStateException("No hay base cargada.");
+      return Extractor.extraerJson(canal, generado, nombreBase);
+    } catch (Throwable t) {
       return GrabarMdb.errorJson(t);
     }
   }

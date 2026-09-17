@@ -2760,13 +2760,44 @@ document.getElementById("btnReset").addEventListener("click", function(){
 function calCount(o){ try{ return (o&&o.tags)?Object.keys(o.tags).length:0; }catch(e){ return 0; } }
 function renderCalStatus(){
   var el=document.getElementById("calStatus"); if(!el) return;
-  if(CAL_OVERRIDE){
+  if(CAL_OVERRIDE && CAL_OVERRIDE.base){
+    var b=CAL_OVERRIDE.base, f=b.ultimaFecha?String(b.ultimaFecha).split("-"):[];
+    var origen = CAL_OVERRIDE.origen==="nube" ? "recibidos de la nube (compartidos con todos)" :
+                 (CAL_OVERRIDE.pendienteNube ? "leídos en este navegador; <b>pendientes de compartir</b> en la nube" : "leídos en este navegador y compartidos en la nube");
+    el.innerHTML='<b>Datos de la base '+esc(b.nombre||"")+'</b> — última calibración n.º '+esc(String(b.ultimoId||""))+
+      (f.length===3?(' del '+f[2]+'/'+f[1]+'/'+f[0]):'')+' · actualizados '+esc(CAL_OVERRIDE.generado||"")+' · '+origen+
+      ' — '+calCount(CAL_OVERRIDE)+' instrumentos.';
+  } else if(CAL_OVERRIDE){
     el.innerHTML='<b>Datos actualizados desde archivo</b>'+(CAL_OVERRIDE.generado?(' (generado '+esc(CAL_OVERRIDE.generado)+')'):'')+
       ' — '+calCount(CAL_OVERRIDE)+' instrumentos. Se aplican sobre las órdenes cargadas.';
   } else {
-    el.innerHTML='Usando los datos incrustados en la app ('+Object.keys(TAG_RANGES).length+' instrumentos). Adjunta un <code>datos_calibracion.json</code> para actualizar sin reconstruir.';
+    el.innerHTML='Usando los datos incrustados en la app ('+Object.keys(TAG_RANGES).length+' instrumentos).';
   }
 }
+/* "Actualizar desde base .mdb": lee (sin grabar) los datos de calibración de la base elegida y los comparte. */
+(function(){
+  var inp=document.getElementById("importBase"); if(!inp) return;
+  var ocupado=false;
+  function estado(html, cls){ var el=document.getElementById("calBaseEstado"); if(!el) return; el.className="dbst"+(cls?" "+cls:""); el.innerHTML=html||""; }
+  inp.addEventListener("change", function(e){
+    var f=e.target.files&&e.target.files[0]; e.target.value="";
+    if(!f || ocupado) return;
+    if(!/\.mdb$/i.test(f.name)){ estado("Elige la base de DPCTrack2 con extensión <b>.mdb</b>.","err"); return; }
+    ocupado=true; inp.disabled=true;
+    var t0=Date.now(), reloj=null;
+    var tick=function(){ estado("Leyendo los datos de calibración de <b>"+esc(f.name)+"</b>… <span class=\"cloudst\">("+Math.round((Date.now()-t0)/1000)+" s)</span>"); };
+    tick(); reloj=setInterval(tick, 1000);
+    var fin=function(r){ clearInterval(reloj); ocupado=false; inp.disabled=false; estado(r.msg, r.cls); renderCalStatus(); };
+    mdbwLeerArchivo(f).then(function(buf){
+      return mdbwCorrer({tipo:"extraer", generado:datosCal.ahoraTexto(), nombre:f.name}, buf, function(){ return mdbwLeerArchivo(f); });
+    }).then(function(out){
+      return datosCal.actualizarDesdeBase(out.datos, f.name);
+    }).then(fin, function(err){
+      var m=(err&&err.name==="NotReadableError")?"La base cambió en el disco mientras se leía (¿DPCTrack la tiene abierta?). Vuelve a elegirla.":((err&&err.message)||String(err));
+      fin({cls:"err", msg:"No se pudieron leer los datos de la base: "+esc(m)});
+    });
+  });
+})();
 document.getElementById("importCalib").addEventListener("change", function(e){
   var file=e.target.files&&e.target.files[0]; if(!file) return;
   var r=new FileReader();
@@ -2921,11 +2952,12 @@ function regenPoints(G,N){
 
 var repState=null;   // {tag, rec, h:{...}, groups:[{meta, rows:[{inNom,outNom,lo,hi,found,left}]}]}
 var REP_BATCH=[];    // reportes generados por lote (de las órdenes cargadas + búsquedas manuales)
+var REP_BATCH_EDITADO=false;   // true si el técnico editó/agregó reportes (no se regenera al llegar datos nuevos)
 
 /* Construye los reportes de calibración de TODAS las órdenes cargadas que estén en la base (TAG_REPORT).
    Los que no estén se omiten. Se deduplica por TAG. Cada entrada es un estado editable independiente. */
 function buildRepBatch(){
-  REP_BATCH=[]; var seen={};
+  REP_BATCH=[]; REP_BATCH_EDITADO=false; var seen={};
   var src=(typeof rows!=="undefined"&&rows)?rows:[];
   src.forEach(function(r){
     if(!r||!r.tag) return;
@@ -2942,6 +2974,7 @@ function buildRepBatch(){
 }
 /* Agrega un instrumento al lote (si no está) y devuelve su índice. */
 function repBatchAdd(rec){
+  REP_BATCH_EDITADO=true;
   var k=normTag(rec.tag);
   for(var i=0;i<REP_BATCH.length;i++){ if(normTag(REP_BATCH[i].rec.tag)===k) return i; }
   REP_BATCH.push(repBuildState(rec)); return REP_BATCH.length-1;
@@ -3006,6 +3039,7 @@ function renderRepTecnicos(){
 /* Pone el técnico seleccionado en TODOS los reportes del lote (y en el actual). Editable después. */
 function repSetTecnicoAll(name){
   if(!name) return;
+  REP_BATCH_EDITADO=true;
   REP_BATCH.forEach(function(st){ st.h.by=name; });
   if(repState){ repState.h.by=name; }
   repRenderForm();
@@ -3330,6 +3364,8 @@ function repGrabar(){
   var tabs=document.querySelectorAll(".tab");
   tabs.forEach(function(t){ t.addEventListener("click", function(){ switchTab(t.getAttribute("data-tab")); }); });
   var f=document.getElementById("repForm");
+  f.addEventListener("input", function(){ REP_BATCH_EDITADO=true; }, true);
+  f.addEventListener("change", function(){ REP_BATCH_EDITADO=true; }, true);
   f.addEventListener("input", function(e){
     var el=e.target; if(el.tagName!=="INPUT" && el.tagName!=="TEXTAREA") return;
     if(el.hasAttribute("data-h")){ repState.h[el.getAttribute("data-h")]=el.value; return; }
@@ -3395,7 +3431,7 @@ function repGrabar(){
   document.getElementById("repTag").addEventListener("keydown", function(e){ if(e.key==="Enter") repSearch(); });
   document.getElementById("repLimpiar").addEventListener("click", function(){
     if(REP_BATCH.length && !confirm("¿Vaciar los "+REP_BATCH.length+" reportes cargados y sus ediciones?")) return;
-    REP_BATCH=[]; repState=null;
+    REP_BATCH=[]; repState=null; REP_BATCH_EDITADO=false;
     document.getElementById("repTag").value=""; document.getElementById("repMsg").innerHTML="";
     renderRepSelect(); repRenderForm();
   });
@@ -3415,32 +3451,48 @@ function repGrabar(){
      el worker, corre en el hilo principal.
    - Opción 2: repGrabar() de siempre (descarga el JSON para grabar.bat), sin cambios.
    ============================================================================ */
-/* Cuerpo del Web Worker (se serializa con toString; no usa nada de fuera salvo MDBW_FACTORY). */
+/* Cuerpo del Web Worker (se serializa con toString; no usa nada de fuera salvo MDBW_FACTORY, mdbwEjecutar y
+   mdbwExtraer). Mensajes: {tipo:"grabar", buffer, json, ahora, nombre, generado} y {tipo:"extraer", buffer, generado, nombre}. */
 function mdbwWorkerMain(){
   var api=null;
   function fin(m, transfer){ self.postMessage(m, transfer||[]); }
   self.onmessage=function(e){
     var m=e.data||{};
-    if(m.tipo!=="grabar") return;
+    if(m.tipo!=="grabar" && m.tipo!=="extraer") return;
     try{
       if(!api) api=MDBW_FACTORY();
-      var r=mdbwEjecutar(api, m.buffer, m.json, m.ahora, m.nombre);
-      m.buffer=null;
-      fin({tipo:"fin", res:r.res, partes:r.partes}, r.partes);
+      if(m.tipo==="grabar"){
+        var r=mdbwEjecutar(api, m.buffer, m.json, m.ahora, m.nombre, m.generado);
+        m.buffer=null;
+        fin({tipo:"fin", res:r.res, partes:r.partes, datos:r.datos}, r.partes);
+      } else {
+        var x=mdbwExtraer(api, m.buffer, m.generado, m.nombre);
+        m.buffer=null;
+        fin({tipo:"fin", datos:x.datos});
+      }
     }catch(err){
       try{ if(api) api.liberar(); }catch(_){}
-      fin({tipo:"fin", res:{ok:false, error:String((err&&err.message)||err)}});
+      fin({tipo:"fin", res:{ok:false, error:String((err&&err.message)||err)}, datos:JSON.stringify({ok:false, error:String((err&&err.message)||err)})});
     }
   };
   fin({tipo:"listo"});
 }
-/* Pasos comunes (worker o hilo principal): cargar por trozos -> grabar+verificar -> leer por trozos. */
-function mdbwEjecutar(api, buffer, json, ahora, nombre){
-  var TROZO=8*1024*1024, total=buffer.byteLength, off, n, res, partes=[];
+/* Carga la base en el escritor por trozos de 8 MB. */
+function mdbwCargar(api, buffer){
+  var TROZO=8*1024*1024, total=buffer.byteLength, off, n;
   api.nuevaBase();
   for(off=0; off<total; off+=TROZO){ n=Math.min(TROZO,total-off); api.agregarBytes(new Int8Array(buffer,off,n)); }
+}
+/* Pasos comunes (worker o hilo principal): cargar -> grabar+verificar -> leer la base de datos de calibración de la
+   base YA ACTUALIZADA (si se insertó algo) -> leer por trozos la base resultante. */
+function mdbwEjecutar(api, buffer, json, ahora, nombre, generado){
+  var TROZO=8*1024*1024, off, res, partes=[], datos=null;
+  mdbwCargar(api, buffer);
   res=JSON.parse(api.grabar(json, ahora, true, nombre));
   if(res.ok){
+    if(res.insertados && generado){
+      try{ datos=api.extraer(generado, nombre); }catch(e){ datos=JSON.stringify({ok:false, error:String((e&&e.message)||e)}); }
+    }
     var sz=api.tamano();
     for(off=0; off<sz; off+=TROZO){
       var p=api.leerBytes(off, Math.min(TROZO, sz-off));
@@ -3449,7 +3501,57 @@ function mdbwEjecutar(api, buffer, json, ahora, nombre){
     }
   }
   api.liberar();
-  return { res:res, partes:partes };
+  return { res:res, partes:partes, datos:datos };
+}
+/* Solo lectura: datos de calibración (formato datos_calibracion.json) de una base. */
+function mdbwExtraer(api, buffer, generado, nombre){
+  mdbwCargar(api, buffer);
+  var datos=api.extraer(generado, nombre);
+  api.liberar();
+  return { datos:datos };
+}
+/* Corre un mensaje del escritor en un Web Worker; si el navegador no deja crearlo, en el hilo principal.
+   releer(): promesa del ArrayBuffer (por si el buffer ya no está disponible). Devuelve el mensaje "fin". */
+var _mdbwApiLocal=null;
+function mdbwCorrer(msg, buf, releer){
+  return new Promise(function(resolve, reject){
+    var w, url, listo=false;
+    try{
+      var src="var MDBW_FACTORY="+MDBW_FACTORY.toString()+";\nvar mdbwCargar="+mdbwCargar.toString()+";\nvar mdbwEjecutar="+mdbwEjecutar.toString()+
+        ";\nvar mdbwExtraer="+mdbwExtraer.toString()+";\n("+mdbwWorkerMain.toString()+")();";
+      url=URL.createObjectURL(new Blob([src],{type:"text/javascript"}));
+      w=new Worker(url);
+    }catch(e){ if(url) URL.revokeObjectURL(url); reject({sinWorker:true}); return; }
+    w.onmessage=function(ev){
+      var m=ev.data||{};
+      if(m.tipo==="listo"){ listo=true; URL.revokeObjectURL(url); msg.buffer=buf; w.postMessage(msg, [buf]); return; }
+      if(m.tipo==="fin"){ w.terminate(); resolve(m); }
+    };
+    w.onerror=function(ev){
+      if(ev && ev.preventDefault) ev.preventDefault();
+      w.terminate(); URL.revokeObjectURL(url);
+      if(!listo) reject({sinWorker:true});
+      else reject(new Error((ev&&ev.message)||"El proceso se detuvo (¿memoria insuficiente?)."));
+    };
+  }).then(null, function(e){
+    if(!(e && e.sinWorker)) throw e;
+    var leer=(buf && buf.byteLength) ? Promise.resolve(buf) : releer();
+    return leer.then(function(b){
+      return new Promise(function(resolve, reject){
+        setTimeout(function(){
+          try{
+            if(!_mdbwApiLocal) _mdbwApiLocal=MDBW_FACTORY();
+            if(msg.tipo==="grabar"){ var r=mdbwEjecutar(_mdbwApiLocal, b, msg.json, msg.ahora, msg.nombre, msg.generado); resolve({tipo:"fin", res:r.res, partes:r.partes, datos:r.datos}); }
+            else { resolve({tipo:"fin", datos:mdbwExtraer(_mdbwApiLocal, b, msg.generado, msg.nombre).datos}); }
+          }catch(err){ try{ _mdbwApiLocal.liberar(); }catch(_){} reject(err); }
+        }, 60);
+      });
+    });
+  });
+}
+function mdbwLeerArchivo(f){
+  if(f.arrayBuffer) return f.arrayBuffer();
+  return new Promise(function(res, rej){ var fr=new FileReader(); fr.onload=function(){ res(fr.result); }; fr.onerror=function(){ rej(fr.error||new Error("No se pudo leer el archivo")); }; fr.readAsArrayBuffer(f); });
 }
 /* Respaldo en la nube de la base ORIGINAL (antes de grabar), en Supabase Storage (bucket PRIVADO 'respaldo-base').
    Siempre existe UNO solo: ruta fija base_original.mdb.gz (cada subida lo reemplaza con x-upsert; el anterior solo
@@ -3512,7 +3614,7 @@ var respaldoNube=(function(){
   }
   function limpiarOtros(){
     return sb.req("/storage/v1/object/list/"+BUCKET,{method:"POST",body:{prefix:"",limit:100,offset:0}}).then(function(list){
-      var otros=(list||[]).map(function(o){ return o&&o.name; }).filter(function(n){ return n && n!==RUTA; });
+      var otros=(list||[]).map(function(o){ return o&&o.name; }).filter(function(n){ return n && n!==RUTA && n!=="datos_calibracion.json.gz"; });
       if(!otros.length) return null;
       return sb.req("/storage/v1/object/"+BUCKET,{method:"DELETE",body:{prefixes:otros}});
     });
@@ -3559,11 +3661,142 @@ var respaldoNube=(function(){
     });
   }
   return { sha256:sha256, preparar:preparar, subirConReintentos:subirConReintentos, info:info, descargar:descargar,
-           nombreOriginal:nombreOriginal, fechaHora:fechaHora, mensaje:mensaje, BUCKET:BUCKET, RUTA:RUTA };
+           nombreOriginal:nombreOriginal, fechaHora:fechaHora, mensaje:mensaje, BUCKET:BUCKET, RUTA:RUTA,
+           comprimir:comprimir, descomprimir:descomprimir, codigo:codigo };
 })();
 
+/* ============================================================================
+   DATOS DE CALIBRACIÓN DESDE LA BASE, COMPARTIDOS EN LA NUBE (datosCal)
+   Lo que autollena notificaciones y reportes por defecto (TAG_RANGES/TAG_REPORT/TEST_INSTR/TECNICOS, en CAL_OVERRIDE)
+   se lee de la base .mdb con el port de src/extract_ranges.ps1 (api.extraer) y se comparte con TODOS los usuarios
+   aprobados: un único archivo datos_calibracion.json.gz en el bucket privado respaldo-base. Dos entradas:
+   (1) tras grabar en línea, de la base YA actualizada; (2) botón "Actualizar desde base .mdb" (tarjeta 02).
+   Nunca retrocede: si la base es más vieja (menor base.ultimoId = MAX(CalibrationID)) que los datos vigentes, no se
+   aplica. Al abrir la app (y al volver la conexión) se bajan los datos de la nube si cambiaron y no son más viejos.
+   Sin conexión: se aplican localmente y quedan "pendienteNube" para compartirse después.
+   ============================================================================ */
+var datosCal=(function(){
+  var RUTA="datos_calibracion.json.gz", META_KEY="noti_calib_nube_v1", _sync=null;
+  function z2(n){ return (n<10?"0":"")+n; }
+  function ahoraTexto(){ var d=new Date(); return d.getFullYear()+"-"+z2(d.getMonth()+1)+"-"+z2(d.getDate())+" "+z2(d.getHours())+":"+z2(d.getMinutes()); }
+  function idDe(o){ return (o && o.base && typeof o.base.ultimoId==="number") ? o.base.ultimoId : 0; }
+  function valido(o){ return !!(o && o.version===2 && o.tags && typeof o.tags==="object" && o.reportes && typeof o.reportes==="object" && Object.keys(o.tags).length>0); }
+  function leerMeta(){ try{ return JSON.parse(localStorage.getItem(META_KEY)||"null")||{}; }catch(e){ return {}; } }
+  function guardarMeta(m){ try{ localStorage.setItem(META_KEY, JSON.stringify(m)); }catch(e){} }
+  function guardarLocal(o){ try{ localStorage.setItem(CAL_STORE_KEY, JSON.stringify(o)); }catch(e){} }
+  function n(o){ try{ return Object.keys(o.tags).length; }catch(e){ return 0; } }
+  function fechaBase(o){ var f=o&&o.base&&o.base.ultimaFecha; if(!f) return ""; var p=String(f).split("-"); return p.length===3 ? (p[2]+"/"+p[1]+"/"+p[0]) : f; }
+
+  /* Aplica en la app: notificaciones, técnicos y, si el lote de reportes no fue tocado, lo regenera con los datos nuevos. */
+  function aplicar(obj, origen){
+    obj.origen=origen;
+    CAL_OVERRIDE=obj; guardarLocal(obj);
+    try{
+      refreshAll();
+      renderRepTecnicos();
+      if(REP_BATCH.length && !REP_BATCH_EDITADO){
+        var tagActual=(repState&&repState.rec)?normTag(repState.rec.tag):"";
+        buildRepBatch(); renderRepSelect();
+        var idx=-1; for(var i=0;i<REP_BATCH.length;i++){ if(normTag(REP_BATCH[i].rec.tag)===tagActual){ idx=i; break; } }
+        var sel=document.getElementById("repSelect");
+        if(idx>=0){ if(sel) sel.value=String(idx); repSelectShow(idx); }
+      } else if(REP_BATCH.length){
+        var msg=document.getElementById("repMsg");
+        if(msg) msg.innerHTML='Llegaron <b>datos de calibración más recientes</b> ('+esc((obj.base&&obj.base.nombre)||"base")+'). Los reportes que busques o agregues desde ahora ya los usan; los que ya editaste no se tocaron.';
+      }
+    }catch(e){}
+  }
+  function codigo(e){ return respaldoNube.codigo(e); }
+  function metaRemota(){
+    return sb.req("/storage/v1/object/list/"+respaldoNube.BUCKET,{method:"POST",body:{prefix:"",limit:100,offset:0}}).then(function(l){
+      for(var i=0;i<(l||[]).length;i++){
+        var o=l[i]; if(o && o.name===RUTA) return { v:(o.updated_at||"")+"|"+(o.id||"")+"|"+((o.metadata&&o.metadata.eTag)||"") };
+      }
+      return null;
+    });
+  }
+  function bajarRemoto(){
+    return sb.req("/storage/v1/object/authenticated/"+respaldoNube.BUCKET+"/"+RUTA+"?t="+Date.now(),{as:"blob"})
+      .then(respaldoNube.descomprimir)
+      .then(function(b){ return b.text(); })
+      .then(function(t){ return JSON.parse(t); })
+      .then(null, function(e){ if(codigo(e)===404 || /not.?found/i.test(String((e&&e.raw&&e.raw.message)||(e&&e.message)||""))) return null; throw e; });
+  }
+  function subir(obj){
+    var copia={}; for(var k in obj){ if(Object.prototype.hasOwnProperty.call(obj,k) && k!=="origen" && k!=="pendienteNube") copia[k]=obj[k]; }
+    return respaldoNube.comprimir(new Blob([JSON.stringify(copia)],{type:"application/json"})).then(function(gz){
+      return sb.req("/storage/v1/object/"+respaldoNube.BUCKET+"/"+RUTA,{method:"POST",raw:gz,contentType:"application/gzip",headers:{"x-upsert":"true","cache-control":"no-cache"}});
+    }).then(metaRemota).then(function(m){ guardarMeta({v:m&&m.v, id:idDe(obj), generado:obj.generado}); return m; });
+  }
+  /* Comparte obj salvo que la nube ya tenga datos de una base más nueva. */
+  function publicar(obj){
+    return bajarRemoto().then(function(rem){
+      if(rem && valido(rem) && idDe(rem) > idDe(obj)) return { estado:"nube_mas_nueva", remoto:rem };
+      return subir(obj).then(function(){ return { estado:"publicado" }; });
+    });
+  }
+  /* Entrada común: texto JSON devuelto por api.extraer. Resuelve {cls, msg} (nunca rechaza). */
+  function actualizarDesdeBase(texto, nombre){
+    var obj;
+    try{ obj=JSON.parse(texto); }catch(e){ return Promise.resolve({cls:"err", msg:"No se pudieron leer los datos de calibración de la base."}); }
+    if(obj && obj.ok===false) return Promise.resolve({cls:"err", msg:"No se pudieron leer los datos de calibración de la base: "+esc(obj.error||"error desconocido")+"."});
+    if(!valido(obj)) return Promise.resolve({cls:"err", msg:"La base no trae datos de instrumentos; no se cambió nada."});
+    obj.generado=ahoraTexto();
+    var actual=CAL_OVERRIDE;
+    if(idDe(obj) < idDe(actual)){
+      return Promise.resolve({cls:"warn", msg:"<b>No se actualizaron los reportes por defecto:</b> la base <b>"+esc(nombre)+"</b> es más vieja (última calibración n.º "+idDe(obj)+
+        ") que los datos vigentes (n.º "+idDe(actual)+", base "+esc((actual.base&&actual.base.nombre)||"")+")."});
+    }
+    obj.pendienteNube=true;
+    aplicar(obj, "base");
+    var desc=n(obj)+" instrumentos, última calibración n.º "+idDe(obj)+(fechaBase(obj)?" del "+fechaBase(obj):"");
+    if(!auth.canSave()) return Promise.resolve({cls:"warn", msg:"<b>Reportes por defecto actualizados en este navegador</b> ("+desc+"). Tu cuenta no puede compartirlos en la nube."});
+    return publicar(obj).then(function(r){
+      if(r.estado==="nube_mas_nueva"){
+        aplicar(r.remoto, "nube");
+        guardarMeta({v:null, id:idDe(r.remoto), generado:r.remoto.generado});
+        return {cls:"warn", msg:"En la nube ya había datos de una base <b>más reciente</b> (última calibración n.º "+idDe(r.remoto)+", "+esc((r.remoto.base&&r.remoto.base.nombre)||"")+"); se aplicaron esos."};
+      }
+      obj.pendienteNube=false; guardarLocal(obj); renderCalStatus();
+      return {cls:"ok", msg:"<b>Reportes por defecto actualizados</b> con la base "+esc(nombre)+" ("+desc+") y <b>compartidos con todos los usuarios</b>."};
+    }, function(e){
+      renderCalStatus();
+      return {cls:"warn", msg:"<b>Reportes por defecto actualizados en este navegador</b> ("+desc+"), pero no se pudieron compartir en la nube ("+esc(respaldoNube.mensaje(e))+"). Se reintentará al abrir la app o al volver la conexión."};
+    });
+  }
+  /* Al abrir la app / volver la conexión: comparte lo pendiente o baja de la nube lo más nuevo. */
+  function sincronizar(){
+    if(_sync) return _sync;
+    if(typeof auth==="undefined" || !auth.canSave() || !sb.isOnline()) return Promise.resolve();
+    var local=CAL_OVERRIDE;
+    var p;
+    if(local && local.pendienteNube && valido(local)){
+      p=publicar(local).then(function(r){
+        if(r.estado==="nube_mas_nueva"){ aplicar(r.remoto, "nube"); guardarMeta({v:null, id:idDe(r.remoto), generado:r.remoto.generado}); }
+        else { local.pendienteNube=false; guardarLocal(local); }
+      });
+    } else {
+      p=metaRemota().then(function(m){
+        if(!m) return;
+        var meta=leerMeta();
+        if(meta.v && meta.v===m.v) return;
+        return bajarRemoto().then(function(rem){
+          if(!valido(rem)) return;
+          var cur=CAL_OVERRIDE;
+          if(idDe(rem) > idDe(cur) || (idDe(rem)===idDe(cur) && (!cur || rem.generado!==cur.generado))) aplicar(rem, "nube");
+          guardarMeta({v:m.v, id:idDe(rem), generado:rem.generado});
+        });
+      });
+    }
+    _sync=p.then(function(){ _sync=null; renderCalStatus(); }, function(){ _sync=null; renderCalStatus(); });
+    return _sync;
+  }
+  return { actualizarDesdeBase:actualizarDesdeBase, sincronizar:sincronizar, ahoraTexto:ahoraTexto, idDe:idDe, fechaBase:fechaBase, RUTA:RUTA };
+})();
+
+
 var dbGrabar=(function(){
-  var archivo=null, salida=null, ocupado=false, reloj=null, apiLocal=null;
+  var archivo=null, salida=null, ocupado=false, reloj=null;
   var prepP=null, tags=[], resumenOk="", fase="", t0=0, hayNube=false;
   function $(id){ return document.getElementById(id); }
   function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
@@ -3589,7 +3822,7 @@ var dbGrabar=(function(){
     $("dbFileName").textContent = archivo ? (archivo.name+" · "+mb(archivo.size)) : "Ninguna base elegida";
   }
   function limpiarResultado(){
-    salida=null; prepP=null; resumenOk=""; t0=0;
+    salida=null; prepP=null; resumenOk=""; t0=0; estadoDatos("");
     $("dbDescargaRow").hidden=true; $("dbNubeFallo").hidden=true; $("dbLog").hidden=true; $("dbLog").textContent=""; estado("");
   }
   function pintarNube(fila){
@@ -3617,41 +3850,14 @@ var dbGrabar=(function(){
     if(ocupado) return;
     $("dbModal").hidden=true; document.body.classList.remove("modal-open");
   }
-  function leerArchivo(f){
-    if(f.arrayBuffer) return f.arrayBuffer();
-    return new Promise(function(res, rej){ var fr=new FileReader(); fr.onload=function(){ res(fr.result); }; fr.onerror=function(){ rej(fr.error||new Error("No se pudo leer el archivo")); }; fr.readAsArrayBuffer(f); });
-  }
-  function enHiloPrincipal(buf0, json, ahora, nombre){
-    var leer = (buf0 && buf0.byteLength) ? Promise.resolve(buf0) : leerArchivo(archivo);
-    return leer.then(function(buf){
-      return new Promise(function(resolve, reject){
-        setTimeout(function(){
-          try{ if(!apiLocal) apiLocal=MDBW_FACTORY(); resolve(mdbwEjecutar(apiLocal, buf, json, ahora, nombre)); }
-          catch(e){ try{ apiLocal.liberar(); }catch(_){} reject(e); }
-        }, 60);
-      });
-    });
-  }
-  function enWorker(buf, json, ahora, nombre){
-    return new Promise(function(resolve, reject){
-      var w, url, listo=false;
-      try{
-        var src="var MDBW_FACTORY="+MDBW_FACTORY.toString()+";\nvar mdbwEjecutar="+mdbwEjecutar.toString()+";\n("+mdbwWorkerMain.toString()+")();";
-        url=URL.createObjectURL(new Blob([src],{type:"text/javascript"}));
-        w=new Worker(url);
-      }catch(e){ if(url) URL.revokeObjectURL(url); reject({sinWorker:true}); return; }
-      w.onmessage=function(ev){
-        var m=ev.data||{};
-        if(m.tipo==="listo"){ listo=true; URL.revokeObjectURL(url); w.postMessage({tipo:"grabar", buffer:buf, json:json, ahora:ahora, nombre:nombre}, [buf]); return; }
-        if(m.tipo==="fin"){ w.terminate(); resolve(m); }
-      };
-      w.onerror=function(ev){
-        if(ev && ev.preventDefault) ev.preventDefault();
-        w.terminate(); URL.revokeObjectURL(url);
-        if(!listo) reject({sinWorker:true});
-        else reject(new Error((ev&&ev.message)||"El proceso de grabado se detuvo (¿memoria insuficiente?)."));
-      };
-    });
+  function leerArchivo(f){ return mdbwLeerArchivo(f); }
+  function estadoDatos(html, cls){ var el=$("dbDatosEstado"); if(!el) return; el.className="dbst"+(cls?" "+cls:""); el.innerHTML=html||""; }
+  /* Tras grabar: los reportes por defecto se actualizan con la base YA actualizada y se comparten. */
+  function actualizarDatos(texto, nombre){
+    if(!texto) return null;
+    estadoDatos("Actualizando los reportes por defecto con la base actualizada…","");
+    return datosCal.actualizarDesdeBase(texto, nombre).then(function(r){ estadoDatos(r.msg, r.cls); },
+      function(e){ estadoDatos("No se pudieron actualizar los reportes por defecto: "+esc((e&&e.message)||e),"warn"); });
   }
   function mensajeLectura(e){
     if(e && e.name==="NotReadableError") return "La base cambió en el disco desde que la elegiste (¿DPCTrack la tiene abierta?). Ciérrala y vuelve a elegir la base.";
@@ -3701,10 +3907,7 @@ var dbGrabar=(function(){
       prepP=respaldoNube.preparar(f, buf, tags);           // huella (antes de transferir el buffer) + gzip en paralelo
       prepP.then(null,function(){});
       fase="Grabando "+j.n+" instrumento(s) y verificando la base… (puede tardar hasta un minuto; no cierres la página)"; tick();
-      return enWorker(buf, j.text, ahora, f.name).catch(function(e){
-        if(e && e.sinWorker) return enHiloPrincipal(buf.byteLength?buf:null, j.text, ahora, f.name);
-        throw e;
-      });
+      return mdbwCorrer({tipo:"grabar", json:j.text, ahora:ahora, nombre:f.name, generado:datosCal.ahoraTexto()}, buf, function(){ return leerArchivo(f); });
     }).then(function(out){
       var r=out.res||{};
       if(!r.ok){
@@ -3723,7 +3926,8 @@ var dbGrabar=(function(){
       salida={ blob:new Blob(out.partes,{type:"application/octet-stream"}), nombre:f.name };
       $("dbDescargaInfo").textContent=f.name+" · "+mb(salida.blob.size);
       resumenOk="<b>Base actualizada y verificada:</b> "+r.insertados+" calibración(es) grabada(s)"+(r.omitidos?", "+r.omitidos+" omitida(s)":"")+".";
-      return respaldar();
+      var datos=out.datos;
+      return respaldar().then(function(){ return actualizarDatos(datos, f.name); });
     }).catch(function(e){
       terminar(); prepP=null;
       estado("<b>No se grabó nada.</b> "+esc(mensajeLectura(e))+"<br>La base original no cambió. Puedes usar la Opción 2 (JSON + grabar.bat).","err");
@@ -3995,6 +4199,7 @@ function switchTab(id){
 }
 /* Inserta o reemplaza un reporte en el lote por TAG; devuelve su índice. */
 function repBatchPut(st){
+  REP_BATCH_EDITADO=true;
   var k=normTag(st.rec.tag);
   for(var i=0;i<REP_BATCH.length;i++){ if(normTag(REP_BATCH[i].rec.tag)===k){ REP_BATCH[i]=st; return i; } }
   REP_BATCH.push(st); return REP_BATCH.length-1;
@@ -4261,6 +4466,8 @@ function bootApp(){                            // UNA vez, tras autenticar y est
   misReportes.updatePendBadge();
   misReportes.flushPending();
   if(auth.isAdmin()) adminUsers.listar();
+  setTimeout(function(){ datosCal.sincronizar(); }, 2500);   // datos de calibración compartidos (si cambiaron)
+  window.addEventListener("online", function(){ datosCal.sincronizar(); });
 }
 auth.init(bootApp);
 </script>

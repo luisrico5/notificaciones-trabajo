@@ -28,7 +28,19 @@ const html = REMOTA ? "" : fs.readFileSync(INDEX);
 const server = http.createServer((req, res) => { res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" }); res.end(html); });
 
 // ---- nube simulada (Storage + tabla respaldo_base), servidor HTTP local ----
-const nube = { modo: "ok", objetos: new Map([["viejo_manual.mdb.gz", Buffer.from("sobrante")]]), fila: null, llamadas: [], intentos: 0, upsert: null, descargaVisibleAlSubir: [] };
+const nube = { modo: "ok", objetos: new Map([["viejo_manual.mdb.gz", Buffer.from("sobrante")]]), actualizado: {}, fila: null, llamadas: [], intentos: 0, upsert: null, descargaVisibleAlSubir: [] };
+const datosNube = () => { const o = nube.objetos.get("datos_calibracion.json.gz"); return o ? JSON.parse(zlib.gunzipSync(o).toString("utf8")) : null; };
+// Opcionales: E2E_REF_DATOS = datos_calibracion.json de extract_ranges.ps1 sobre la MISMA base (compara contenido);
+// E2E_BASE_VIEJA = copia de una base más vieja (debe rechazarse sin tocar los datos vigentes).
+const REF_DATOS = process.env.E2E_REF_DATOS ? JSON.parse(fs.readFileSync(process.env.E2E_REF_DATOS, "utf8").replace(/^﻿/, "")) : null;
+function igualContenido(a, b) {
+  if (a === b) return true;
+  if (typeof a !== typeof b || a === null || b === null) return false;
+  if (Array.isArray(a)) return Array.isArray(b) && a.length === b.length && a.every((x, i) => igualContenido(x, b[i]));
+  if (typeof a === "object") { const ka = Object.keys(a), kb = Object.keys(b); return ka.length === kb.length && ka.every(k => k in b && igualContenido(a[k], b[k])); }
+  return false;
+}
+const mismosDatos = (a, b) => ["tags", "reportes", "patrones", "tecnicos"].every(k => igualContenido(a[k], b[k]));
 let paginaActual = null;   // página cuya UI se consulta mientras sube el respaldo
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-upsert, cache-control, prefer, accept", "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS" };
 const mock = http.createServer(async (req, res) => {
@@ -39,18 +51,27 @@ const mock = http.createServer(async (req, res) => {
   if (process.env.E2E_DEBUG) console.log("  [nube] " + m + " " + ruta + " " + body.length + " bytes");
   if (m === "OPTIONS") { res.writeHead(204, CORS); return res.end(); }
   nube.llamadas.push(m + " " + ruta);
-  if (ruta === RUTA && m === "POST") {
-    nube.intentos++;
-    try { if (paginaActual) nube.descargaVisibleAlSubir.push(await paginaActual.ev("!document.getElementById('dbDescargaRow').hidden")); } catch (e) { }
+  let mm;
+  if ((mm = ruta.match(/^\/storage\/v1\/object\/respaldo-base\/([^/]+)$/)) && m === "POST") {
+    const nombre = decodeURIComponent(mm[1]), esBase = (ruta === RUTA);
+    if (esBase) {
+      nube.intentos++;
+      try { if (paginaActual) nube.descargaVisibleAlSubir.push(await paginaActual.ev("!document.getElementById('dbDescargaRow').hidden")); } catch (e) { }
+    } else nube.subidasDatos = (nube.subidasDatos || 0) + 1;
     if (nube.modo === "caida") return json(503, { message: "Service Unavailable" });
     if (nube.modo === "403") return json(400, { statusCode: "403", error: "Unauthorized", message: "new row violates row-level security policy" });
-    nube.objetos.set("base_original.mdb.gz", body); nube.upsert = req.headers["x-upsert"]; nube.tipo = req.headers["content-type"];
-    return json(200, { Key: "respaldo-base/base_original.mdb.gz" });
+    nube.objetos.set(nombre, body); nube.actualizado[nombre] = new Date().toISOString() + "#" + Math.random();
+    if (esBase) { nube.upsert = req.headers["x-upsert"]; nube.tipo = req.headers["content-type"]; }
+    return json(200, { Key: "respaldo-base/" + nombre });
   }
-  if (ruta === "/storage/v1/object/list/respaldo-base") return json(200, Array.from(nube.objetos.keys()).map(n => ({ name: n, id: n })));
+  if (ruta === "/storage/v1/object/list/respaldo-base") {
+    if (nube.modo === "caida") return json(503, { message: "Service Unavailable" });
+    return json(200, Array.from(nube.objetos.keys()).map(n => ({ name: n, id: n, updated_at: nube.actualizado[n] || "t0" })));
+  }
   if (ruta === "/storage/v1/object/respaldo-base" && m === "DELETE") { const b = JSON.parse(body.toString("utf8")); b.prefixes.forEach(k => nube.objetos.delete(k)); return json(200, b.prefixes.map(k => ({ name: k }))); }
-  if (ruta === "/storage/v1/object/authenticated/respaldo-base/base_original.mdb.gz") {
-    const o = nube.objetos.get("base_original.mdb.gz");
+  if ((mm = ruta.match(/^\/storage\/v1\/object\/authenticated\/respaldo-base\/([^/]+)$/))) {
+    if (nube.modo === "caida") return json(503, { message: "Service Unavailable" });
+    const o = nube.objetos.get(decodeURIComponent(mm[1]));
     if (!o) return json(400, { statusCode: "404", error: "not_found", message: "Object not found" });
     res.writeHead(200, Object.assign({ "Content-Type": "application/gzip" }, CORS)); return res.end(o);
   }
@@ -110,8 +131,8 @@ async function main() {
     throw new Error("No se descargó " + patron);
   }
 
-  async function nuevaPagina(url, etiqueta) {
-    const { targetId } = await cdp.send("Target.createTarget", { url: "about:blank" });
+  async function nuevaPagina(url, etiqueta, contexto) {
+    const { targetId } = await cdp.send("Target.createTarget", contexto ? { url: "about:blank", browserContextId: contexto } : { url: "about:blank" });
     const { sessionId: s } = await cdp.send("Target.attachToTarget", { targetId, flatten: true });
     const S = (m, p) => cdp.send(m, p, s);
     const dialogs = [];
@@ -157,7 +178,19 @@ async function main() {
       }
       return { lat, seg: ((Date.now() - t0) / 1000).toFixed(1), estado: await ev("document.getElementById('dbEstado').textContent"), clase: await ev("document.getElementById('dbEstado').className") };
     };
-    const pagina = { S, ev, esperar, setFile, dialogs, targetId, grabar };
+    // Espera el resultado de "reportes por defecto" tras un grabado.
+    const esperarDatos = async () => {
+      await esperar("/\\b(ok|warn|err)\\b/.test(document.getElementById('dbDatosEstado').className)", 180000, "datos de calibración tras grabar");
+      return { cls: (await ev("document.getElementById('dbDatosEstado').className")).replace("dbst", "").trim(), texto: await ev("document.getElementById('dbDatosEstado').textContent") };
+    };
+    // Tarjeta 02: "Actualizar desde base .mdb".
+    const actualizarDesdeBase = async (archivo) => {
+      await ev("var e=document.getElementById('calBaseEstado'); e.className='dbst'; e.innerHTML=''; true");
+      await setFile("#importBase", archivo);
+      await esperar("/\\b(ok|warn|err)\\b/.test(document.getElementById('calBaseEstado').className)", 180000, "actualizar desde base");
+      return { cls: (await ev("document.getElementById('calBaseEstado').className")).replace("dbst", "").trim(), texto: await ev("document.getElementById('calBaseEstado').textContent") };
+    };
+    const pagina = { S, ev, esperar, setFile, dialogs, targetId, grabar, esperarDatos, actualizarDesdeBase };
     paginaActual = pagina;
     return pagina;
   }
@@ -176,6 +209,26 @@ async function main() {
   ok(await P.ev("REP_BATCH[1].groups[0].rows.length") === 5, "LT-U6924 quedó con 5 puntos (editado en el formulario)");
   await P.ev(`repSelectShow(3); var el=document.querySelector('#repForm input[data-k="found"][data-g="0"][data-p="1"]'); el.value=String(REP_BATCH[3].groups[0].rows[1].hi+1); el.dispatchEvent(new Event('input',{bubbles:true})); true`);
   ok(await P.ev("REP_BATCH[3].groups[0].rows[1].found > REP_BATCH[3].groups[0].rows[1].hi"), "PT-U7122 punto 2 con Enc. fuera de límite (editado en el formulario)");
+
+  console.log("\n[1b] Tarjeta 02: 'Actualizar desde base .mdb' (solo lectura) y compartir con todos");
+  await sleep(3500);   // deja pasar la sincronización del arranque (la nube aún no tiene datos)
+  ok(await P.ev("CAL_OVERRIDE===null"), "arranca con los datos incrustados (la nube no tenía datos)");
+  const baseDatos = copiaEn("datos", "base_para_datos.mdb"), hashDatos = hash(baseDatos);
+  const rd = await P.actualizarDesdeBase(baseDatos);
+  ok(rd.cls === "ok" && /compartidos con todos/.test(rd.texto), "actualizó y compartió: " + rd.texto);
+  const d1 = datosNube();
+  const idBase = (d1 && d1.base) ? d1.base.ultimoId : 0;
+  ok(d1 && d1.base.nombre === "base_para_datos.mdb" && idBase > 0 && Object.keys(d1.tags).length > 1000, "datos en la nube (" + (d1 ? Object.keys(d1.tags).length : 0) + " instrumentos, última calibración n.º " + idBase + ")");
+  ok(await P.ev("!!CAL_OVERRIDE && CAL_OVERRIDE.base.ultimoId===" + idBase + " && CAL_OVERRIDE.pendienteNube===false"), "aplicados en la app y marcados como compartidos");
+  ok(/Datos de la base base_para_datos\.mdb/.test(await P.ev("document.getElementById('calStatus').textContent")), "la tarjeta 02 muestra la base y el estado");
+  if (REF_DATOS) ok(d1 && mismosDatos(REF_DATOS, d1), "contenido IDÉNTICO al datos_calibracion.json de extract_ranges.ps1 sobre la misma base");
+  ok(hash(baseDatos) === hashDatos, "la base leída no cambió");
+  if (process.env.E2E_BASE_VIEJA) {
+    const antes = nube.actualizado["datos_calibracion.json.gz"];
+    const rv = await P.actualizarDesdeBase(copiaEn("vieja", "base_vieja.mdb", process.env.E2E_BASE_VIEJA));
+    ok(rv.cls === "warn" && /más vieja/.test(rv.texto), "base más vieja rechazada: " + rv.texto);
+    ok(nube.actualizado["datos_calibracion.json.gz"] === antes && await P.ev("CAL_OVERRIDE.base.ultimoId===" + idBase), "ni la nube ni la app retrocedieron");
+  }
 
   console.log("\n[2] Botón 'Grabar a la base de datos' abre el diálogo");
   await P.ev("document.getElementById('repGrabar').click(); true");
@@ -213,7 +266,8 @@ async function main() {
   ok(nube.descargaVisibleAlSubir.length === 1 && nube.descargaVisibleAlSubir[0] === false, "mientras subía el respaldo NO se ofrecía la descarga");
   ok(nube.intentos === 1 && nube.upsert === "true" && /gzip/.test(nube.tipo || ""), "subida única con x-upsert y tipo gzip");
   const obj1 = nube.objetos.get("base_original.mdb.gz");
-  ok(nube.objetos.size === 1 && obj1, "queda UN solo objeto en el bucket (se borró el sobrante)");
+  const soloEsperados = () => Array.from(nube.objetos.keys()).every(k => k === "base_original.mdb.gz" || k === "datos_calibracion.json.gz");
+  ok(obj1 && soloEsperados() && !nube.objetos.has("viejo_manual.mdb.gz"), "UN solo respaldo de base en el bucket (se borró el sobrante; se conserva el archivo de datos compartidos)");
   ok(obj1 && gunzip(obj1).equals(orig1), "el respaldo descomprimido es idéntico byte a byte a la base ORIGINAL (" + orig1.length + " -> " + (obj1 ? obj1.length : 0) + " bytes)");
   ok(nube.fila && nube.fila.nombre === "20260908_dpctrack2_editable.mdb" && nube.fila.bytes === orig1.length && nube.fila.bytes_gz === obj1.length && nube.fila.sha256 === hash(orig1, "sha256"), "fila: nombre, tamaños y SHA-256 correctos");
   ok(JSON.stringify(nube.fila && nube.fila.instrumentos) === JSON.stringify(TAGS) && /on_conflict=id/.test(nube.onConflict || ""), "fila: instrumentos del grabado, upsert por id");
@@ -223,6 +277,10 @@ async function main() {
   const mdbOut = await esperarDescarga("20260908_dpctrack2_editable.mdb", 60000);
   ok(fs.statSync(mdbOut.file).size > 1000000 && !fs.readFileSync(mdbOut.file).equals(orig1), "descargó la base actualizada con el mismo nombre");
   ok(hash(ed1) === hashAntes, "el archivo original del PC no cambió");
+  const dd4 = await P.esperarDatos(), d4 = datosNube();
+  ok(dd4.cls === "ok" && d4 && d4.base.ultimoId > idBase && d4.base.nombre === "20260908_dpctrack2_editable.mdb", "tras grabar, reportes por defecto actualizados con la base YA actualizada (n.º " + (d4 && d4.base.ultimoId) + ") y compartidos: " + dd4.texto);
+  ok(await P.ev("repLookup('LT-R161').by") === "PRUEBA E2E" && await P.ev("CAL_OVERRIDE.tags.LTR161.by") === "PRUEBA E2E", "el reporte y la notificación por defecto de LT-R161 ya traen al técnico del grabado");
+  const idTras4 = d4 ? d4.base.ultimoId : 0;
 
   console.log("\n[5] Descargar el respaldo de la nube");
   await P.ev("document.getElementById('dbNubeDescargar').click(); true");
@@ -250,8 +308,11 @@ async function main() {
   const r7 = await P.grabar(ed2);
   const obj2 = nube.objetos.get("base_original.mdb.gz");
   ok(/Respaldo de la base original guardado/.test(r7.estado), "grabó y respaldó (" + r7.seg + " s)");
-  ok(nube.objetos.size === 1 && obj2 && gunzip(obj2).equals(orig2) && !gunzip(obj2).equals(orig1), "el único objeto ahora es la original del SEGUNDO grabado");
+  ok(soloEsperados() && obj2 && gunzip(obj2).equals(orig2) && !gunzip(obj2).equals(orig1), "el único respaldo de base ahora es la original del SEGUNDO grabado");
   ok(nube.fila.sha256 === hash(orig2, "sha256") && nube.fila.bytes === orig2.length, "la fila se actualizó con la nueva original");
+  const dd7 = await P.esperarDatos(), d7 = datosNube();
+  ok(dd7.cls === "ok" && d7 && d7.base.ultimoId > idTras4, "segundo grabado: datos compartidos avanzan (n.º " + (d7 && d7.base.ultimoId) + ")");
+  const idTras7 = d7 ? d7.base.ultimoId : 0;
 
   console.log("\n[8] Nube caída: 3 intentos, luego descargar ORIGINAL y ACTUALIZADA; reintento manual");
   nube.modo = "caida"; nube.intentos = 0;
@@ -265,6 +326,8 @@ async function main() {
   await P.ev("document.getElementById('dbOriginal').click(); true");
   const o3 = await esperarDescarga(/^20260908_dpctrack2_editable_ORIGINAL_\d{4}-\d{2}-\d{2}_\d{4}\.mdb$/, 60000);
   ok(fs.readFileSync(o3.file).equals(orig3), "'Descargar base original' baja " + o3.nombre + " idéntica a la elegida");
+  const dd8 = await P.esperarDatos();
+  ok(dd8.cls === "warn" && /más vieja/.test(dd8.texto) && datosNube().base.ultimoId === idTras7, "la base de este grabado es más vieja que los datos vigentes: no retrocede (" + dd8.texto + ")");
   await P.ev("document.getElementById('dbDescargar').click(); true");
   const m3 = await esperarDescarga("20260908_dpctrack2_editable.mdb", 60000);
   ok(fs.statSync(m3.file).size > 1000000 && !fs.readFileSync(m3.file).equals(orig3), "'Descargar base actualizada' también funciona");
@@ -299,7 +362,16 @@ async function main() {
     const rF = await F.grabar(edF);
     ok(/Respaldo de la base original guardado/.test(rF.estado) && gunzip(nube.objetos.get("base_original.mdb.gz")).equals(fs.readFileSync(edF)),
       "también graba y respalda abriendo index.html local (" + (workers.length > w2 ? "Web Worker" : "hilo principal") + ")");
+    ok(await F.ev("!!CAL_OVERRIDE && CAL_OVERRIDE.origen==='nube' && CAL_OVERRIDE.base.ultimoId===" + idTras7), "al abrir recibió de la nube los datos compartidos");
   }
+
+  console.log("\n[12] Otro navegador (perfil limpio): al abrir recibe los datos compartidos");
+  const { browserContextId } = await cdp.send("Target.createBrowserContext", {});
+  const O = await nuevaPagina(URLH, "otro", browserContextId);
+  await O.esperar("!!CAL_OVERRIDE && CAL_OVERRIDE.origen==='nube'", 30000, "sincronización en otro navegador");
+  ok(await O.ev("CAL_OVERRIDE.base.ultimoId") === idTras7, "aplicó los datos de la nube (n.º " + idTras7 + ")");
+  ok(await O.ev("repLookup('LT-R161').by") === "PRUEBA E2E", "el reporte por defecto de LT-R161 ya viene actualizado en el otro navegador");
+  ok(/recibidos de la nube/.test(await O.ev("document.getElementById('calStatus').textContent")), "la tarjeta 02 indica que vienen de la nube");
 
   ok(errores.length === 0, "sin errores de JavaScript en consola" + (errores.length ? ": " + errores.join(" | ") : ""));
   fs.writeFileSync(path.join(WORK, "resultado_browser.json"), JSON.stringify({ mdb: mdbOut.file, json: jsonOut.file, base: ed1 }));

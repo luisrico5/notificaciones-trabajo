@@ -185,8 +185,19 @@ El backend es un proyecto gratuito de [Supabase](https://supabase.com) (Postgres
 > borra también sus reportes guardados.
 
 ## Base de calibración (rangos, salidas, patrones, técnico, indicación)
-Estos datos vienen **incrustados** en `index.html` desde la base DPCTrack2. Para **actualizarlos a futuro
-sin reconstruir**:
+Estos datos (y los **reportes que se abren por defecto** al poner una orden o un TAG) vienen incrustados en
+`index.html` desde la base DPCTrack2, pero **se mantienen actualizados solos para todos los usuarios**:
+- **Al grabar en línea** ("Grabar a la base de datos", Opción 1), la página lee los datos de la base **ya
+  actualizada** y los comparte en la nube (un único archivo privado, solo usuarios aprobados).
+- **Tarjeta 02 · Base de calibración → "Actualizar desde base .mdb"**: eliges una base y solo se leen sus datos
+  (la base no se modifica); también se comparten. Útil si se calibró directo en DPCTrack.
+- Cada técnico recibe los datos compartidos **al abrir la app** (y al volver la conexión). Sin internet sigue con
+  los últimos que recibió; lo que se leyó sin conexión se comparte después.
+- **Nunca retrocede:** si la base es más vieja (su última calibración tiene un número menor) que la de los datos
+  vigentes, no se reemplazan y se avisa.
+- Es el mismo resultado que `src/extract_ranges.ps1` (port verificado: contenido idéntico en tres bases distintas).
+
+Alternativa manual (sin nube), como antes:
 1. Ejecuta el extractor sobre la base nueva (genera `datos_calibracion.json`):
    ```
    powershell -ExecutionPolicy Bypass -File src\extract_ranges.ps1 -Mdb "ruta\base_nueva.mdb" -Password "<clave>"
@@ -195,9 +206,8 @@ sin reconstruir**:
    en tu navegador y **manda sobre los datos incrustados** (los TAG que no incluya usan los incrustados).
    "Volver a los datos incrustados" descarta el archivo adjuntado.
 
-> El navegador **no** puede abrir el `.mdb` directamente (Access con contraseña); por eso el puente es el
-> `.json`. Toda la lógica se conserva; solo cambian los datos. Alternativamente, reconstruye `index.html`
-> para dejar los datos nuevos incrustados.
+> Para dejar los datos nuevos incrustados en la página (valor por defecto sin nube), reconstruye `index.html`
+> después del paso 1.
 
 ## Estructura del proyecto
 ```
