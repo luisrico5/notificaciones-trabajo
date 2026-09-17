@@ -113,6 +113,8 @@
   table.map th,table.map td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
   table.map th{color:var(--muted);font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;font-weight:600}
   table.map td.actions{white-space:nowrap;text-align:right}
+  table.map th.selcol,table.map td.selcol{width:30px;text-align:center;padding-right:0}
+  table.map input[type=checkbox]{width:15px;height:15px;accent-color:#111;cursor:pointer;margin:0}
   .lnk{background:none;border:none;color:var(--ink);cursor:pointer;font:inherit;font-size:13px;font-weight:600;padding:2px 6px;text-decoration:underline;text-underline-offset:2px}
   .lnk:hover{color:var(--ink-strong)}
   .lnk.del{color:var(--red-tx)}
@@ -362,10 +364,11 @@
       <span class="grow"></span>
       <select id="misKind"><option value="">Todos</option><option value="calibracion">Calibraciones</option><option value="notificacion">Notificaciones</option></select>
       <select id="misUser" hidden><option value="">Todos los usuarios</option></select>
+      <button id="misAbrirSel" class="btn" style="margin-top:0" disabled>Abrir seleccionados</button>
       <button id="misAbrirTodos" class="btn" style="margin-top:0">Abrir todos</button>
       <button id="misRefresh" class="btn ghost" style="margin-top:0">Actualizar</button>
     </div>
-    <p class="hint" style="margin-top:0">Reportes de calibración y notificaciones guardados en tu cuenta. <b>Abrir</b> los carga en su pestaña para seguir editando; <b>Abrir todos</b> carga de una vez los de la lista y los eliges en el desplegable de cada pestaña, igual que al procesar un pegado; <b>PDF / JSON / .txt</b> descargan tal como se guardaron; <b>Eliminar</b> los borra de la cuenta.</p>
+    <p class="hint" style="margin-top:0">Reportes de calibración y notificaciones guardados en tu cuenta. Marca las <b>casillas</b> de los que quieras y pulsa <b>Abrir seleccionados</b> (la casilla de la cabecera marca todos los de la lista); <b>Abrir todos</b> carga de una vez los de la lista. Los abiertos se eligen en el desplegable de cada pestaña, igual que al procesar un pegado. <b>Abrir</b> carga uno solo; <b>PDF / JSON / .txt</b> descargan tal como se guardaron; <b>Eliminar</b> los borra de la cuenta.</p>
     <div id="misPend" hidden></div>
     <div id="misMsg" class="hint"></div>
     <div class="tbl-wrap"><div id="misList"></div></div>

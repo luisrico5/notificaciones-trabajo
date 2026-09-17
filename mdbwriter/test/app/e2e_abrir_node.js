@@ -24,7 +24,12 @@ function load() {
     if (u.pathname === "/rest/v1/reportes" && m === "GET") {
       nube.gets.push(u.search);
       const kind = (u.searchParams.get("kind") || "").replace("eq.", "");
-      return res(200, nube.filas.filter(f => !kind || f.kind === kind));
+      const idf = u.searchParams.get("id") || "";
+      let r = nube.filas.filter(f => !kind || f.kind === kind);
+      const mIn = idf.match(/^in\.\((.*)\)$/);
+      if (mIn) { const ids = mIn[1].split(","); r = r.filter(f => ids.indexOf(f.id) >= 0); }
+      else if (idf.indexOf("eq.") === 0) r = r.filter(f => f.id === idf.slice(3));
+      return res(200, r);
     }
     return res(200, []);
   };
@@ -134,6 +139,55 @@ function filaNoti(api, tag, ot, recibido, id, fecha) {
     await api.misReportes.abrirTodos();
     eq(api.REP_BATCH.length, 1, "un payload dañado no impide abrir los demás");
     ok(/1 no se pudo abrir/.test(L.els.misMsg.textContent), "avisa del dañado: " + L.els.misMsg.textContent);
+  }
+
+  console.log("\n[A5] Abrir seleccionados (casillas)");
+  { const L = load(); await sleep(30); const api = L.api;
+    L.nube.filas = [
+      filaCal(api, "TIT-DR719", "21000003", 4.10, "c2", "2026-09-17T12:00:00Z"),
+      filaNoti(api, "LT-R161", "21000002", "MARIA", "n1", "2026-09-17T11:00:00Z"),
+      filaCal(api, "PT-U7122", "21000001", 4.05, "c1", "2026-09-17T10:00:00Z")
+    ];
+    await api.misReportes.listar();                      // pobla la lista (y lo que se puede seleccionar)
+    await api.misReportes.abrirSeleccionados();
+    ok(/Marca con la casilla/.test(L.els.misMsg.textContent), "sin nada marcado avisa: " + L.els.misMsg.textContent);
+    eq(api.REP_BATCH.length, 0, "y no abre nada");
+    api.misReportes.seleccionar("c1", true);             // marcar dos de los tres
+    api.misReportes.seleccionar("n1", true);
+    eq(api.misReportes.seleccionados().length, 2, "quedan 2 marcados");
+    eq(L.els.misAbrirSel.textContent, "Abrir seleccionados (2)", "el botón muestra cuántos: " + L.els.misAbrirSel.textContent);
+    eq(L.els.misAbrirSel.disabled, false, "el botón se habilita al marcar");
+    L.nube.gets.length = 0;
+    await api.misReportes.abrirSeleccionados();
+    ok(/id=in\./.test(L.nube.gets.join("|")), "se piden solo los marcados por id");
+    eq(api.REP_BATCH.length, 1, "abrió solo la calibración marcada");
+    eq(api.REP_BATCH[0].rec.tag, "PT-U7122", "y es la correcta");
+    eq(api.rows.length, 1, "abrió solo la notificación marcada");
+    eq(api.misReportes.seleccionados().length, 0, "al abrirlos se limpia la selección");
+    eq(L.els.misAbrirSel.disabled, true, "el botón vuelve a quedar deshabilitado");
+    eq(api.avisoSalida.hayTrabajo(), false, "lo abierto no cuenta como trabajo sin guardar");
+    // Reabrir uno que ya está cargado: avisa antes de reemplazar.
+    api.misReportes.seleccionar("c1", true);
+    L.estado.confirm = false;
+    api.REP_BATCH[0].groups[0].rows[0].found = 9.99;
+    await api.misReportes.abrirSeleccionados();
+    eq(api.REP_BATCH[0].groups[0].rows[0].found, 9.99, "si se cancela el aviso de reemplazo, no se toca lo cargado");
+    L.estado.confirm = true;
+    await api.misReportes.abrirSeleccionados();
+    eq(api.REP_BATCH[0].groups[0].rows[0].found, 4.05, "al aceptar, se reemplaza por lo guardado");
+  }
+
+  console.log("\n[A6] Selección de muchos: se pide en lotes");
+  { const L = load(); await sleep(30); const api = L.api;
+    L.nube.filas = [];
+    for (let i = 1; i <= 45; i++) L.nube.filas.push(filaNoti(api, "LT-R161", "2100" + (1000 + i), "TEC " + i, "n" + i, "2026-09-17T10:00:00Z"));
+    await api.misReportes.listar();
+    L.nube.filas.forEach(f => api.misReportes.seleccionar(f.id, true));
+    eq(api.misReportes.seleccionados().length, 45, "45 marcados");
+    L.nube.gets.length = 0;
+    await api.misReportes.abrirSeleccionados();
+    eq(L.nube.gets.length, 2, "se pidieron en 2 lotes (40 + 5), sin URLs enormes");
+    eq(api.rows.length, 45, "se abrieron las 45 órdenes");
   }
 
   console.log("\nRESUMEN ABRIR: " + pass + " OK, " + fail + " FAIL");

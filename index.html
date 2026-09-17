@@ -113,6 +113,8 @@
   table.map th,table.map td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
   table.map th{color:var(--muted);font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;font-weight:600}
   table.map td.actions{white-space:nowrap;text-align:right}
+  table.map th.selcol,table.map td.selcol{width:30px;text-align:center;padding-right:0}
+  table.map input[type=checkbox]{width:15px;height:15px;accent-color:#111;cursor:pointer;margin:0}
   .lnk{background:none;border:none;color:var(--ink);cursor:pointer;font:inherit;font-size:13px;font-weight:600;padding:2px 6px;text-decoration:underline;text-underline-offset:2px}
   .lnk:hover{color:var(--ink-strong)}
   .lnk.del{color:var(--red-tx)}
@@ -362,10 +364,11 @@
       <span class="grow"></span>
       <select id="misKind"><option value="">Todos</option><option value="calibracion">Calibraciones</option><option value="notificacion">Notificaciones</option></select>
       <select id="misUser" hidden><option value="">Todos los usuarios</option></select>
+      <button id="misAbrirSel" class="btn" style="margin-top:0" disabled>Abrir seleccionados</button>
       <button id="misAbrirTodos" class="btn" style="margin-top:0">Abrir todos</button>
       <button id="misRefresh" class="btn ghost" style="margin-top:0">Actualizar</button>
     </div>
-    <p class="hint" style="margin-top:0">Reportes de calibración y notificaciones guardados en tu cuenta. <b>Abrir</b> los carga en su pestaña para seguir editando; <b>Abrir todos</b> carga de una vez los de la lista y los eliges en el desplegable de cada pestaña, igual que al procesar un pegado; <b>PDF / JSON / .txt</b> descargan tal como se guardaron; <b>Eliminar</b> los borra de la cuenta.</p>
+    <p class="hint" style="margin-top:0">Reportes de calibración y notificaciones guardados en tu cuenta. Marca las <b>casillas</b> de los que quieras y pulsa <b>Abrir seleccionados</b> (la casilla de la cabecera marca todos los de la lista); <b>Abrir todos</b> carga de una vez los de la lista. Los abiertos se eligen en el desplegable de cada pestaña, igual que al procesar un pegado. <b>Abrir</b> carga uno solo; <b>PDF / JSON / .txt</b> descargan tal como se guardaron; <b>Eliminar</b> los borra de la cuenta.</p>
     <div id="misPend" hidden></div>
     <div id="misMsg" class="hint"></div>
     <div class="tbl-wrap"><div id="misList"></div></div>
@@ -457,7 +460,7 @@
   </section>
 </div>
 
-<footer>Funciona en tu navegador · Los reportes se guardan en tu cuenta (Supabase) · Sin conexión puedes generar .txt/PDF; guardar requiere internet · <span title="Fecha de compilación. Si no coincide con la última, recarga con Ctrl+Shift+R.">versión 2026-09-17 13:16</span></footer>
+<footer>Funciona en tu navegador · Los reportes se guardan en tu cuenta (Supabase) · Sin conexión puedes generar .txt/PDF; guardar requiere internet · <span title="Fecha de compilación. Si no coincide con la última, recarga con Ctrl+Shift+R.">versión 2026-09-17 13:41</span></footer>
 </div>
 <div id="reportPrint" aria-hidden="true"></div>
 <div id="authGate">
@@ -7651,6 +7654,7 @@ function repBatchPut(st){
 
 /* ---------- misReportes: serialización, guardado con cola, listado, abrir, descargar, eliminar ---------- */
 var misReportes=(function(){
+  var SEL={}, VISIBLES=[];   // casillas marcadas en Mis reportes / ids que muestra la lista
   function $(id){ return document.getElementById(id); }
   function n(v){ return (v==null)?NaN:pnum(v); }
   function fmtDT(iso){ var d=new Date(iso); if(isNaN(d.getTime())) return iso||""; var z=function(v){return (v<10?"0":"")+v;}; return z(d.getDate())+"/"+z(d.getMonth()+1)+"/"+d.getFullYear()+" "+z(d.getHours())+":"+z(d.getMinutes()); }
@@ -7798,7 +7802,7 @@ var misReportes=(function(){
   // ---- listar / abrir / descargar / eliminar ----
   /* Filtros de la pestaña (tipo y, para el admin, usuario). Los comparten "listar" y "Abrir todos". */
   function filtrosActuales(){
-    var q={order:"updated_at.desc",limit:200};
+    var q={order:"updated_at.desc",limit:1000};
     var ke=$("misKind"), kind=(ke&&ke.value)||""; if(kind) q.kind="eq."+kind;
     var us=$("misUser"); if(us&&auth.isAdmin()&&us.value) q.user_id="eq."+us.value;
     return q;
@@ -7814,14 +7818,31 @@ var misReportes=(function(){
       items=items||[]; var adm=auth.isAdmin();
       if(msg) msg.textContent=items.length?"":"Todavía no hay nada guardado en tu cuenta.";
       if(cnt) cnt.textContent=items.length?(items.length+" guardado(s)"):"";
-      list.innerHTML='<table class="map"><thead><tr><th>Tipo</th><th>TAG</th><th>OT</th><th>Título</th>'+(adm?'<th>Usuario</th>':'')+'<th>Actualizado</th><th></th></tr></thead><tbody>'+
+      VISIBLES=items.map(function(x){ return x.id; });
+      Object.keys(SEL).forEach(function(id){ if(VISIBLES.indexOf(id)<0) delete SEL[id]; });   // lo que ya no se lista deja de contar
+      list.innerHTML='<table class="map"><thead><tr><th class="selcol"><input type="checkbox" id="misSelAll" title="Marcar todos los de la lista"></th><th>Tipo</th><th>TAG</th><th>OT</th><th>Título</th>'+(adm?'<th>Usuario</th>':'')+'<th>Actualizado</th><th></th></tr></thead><tbody>'+
         items.map(function(x){ var isCal=(x.kind==="calibracion");
-          return '<tr><td><span class="badge '+(isCal?"info":"ok")+'">'+(isCal?"Calibración":"Notificación")+'</span></td><td><code>'+esc(x.tag)+'</code></td><td>'+esc(x.ot)+'</td><td>'+esc(x.titulo)+'</td>'+
+          return '<tr><td class="selcol"><input type="checkbox" data-sel="'+escA(x.id)+'"'+(SEL[x.id]?' checked':'')+' title="Seleccionar para abrir"></td>'+
+            '<td><span class="badge '+(isCal?"info":"ok")+'">'+(isCal?"Calibración":"Notificación")+'</span></td><td><code>'+esc(x.tag)+'</code></td><td>'+esc(x.ot)+'</td><td>'+esc(x.titulo)+'</td>'+
             (adm?('<td>'+esc((x.profiles&&x.profiles.full_name)||"")+'</td>'):'')+'<td>'+esc(fmtDT(x.updated_at))+'</td>'+
             '<td class="actions"><button class="lnk" data-open="'+escA(x.id)+'">Abrir</button> '+
             (isCal?('<button class="lnk" data-dlpdf="'+escA(x.id)+'">PDF</button> <button class="lnk" data-dljson="'+escA(x.id)+'">JSON</button> '):('<button class="lnk" data-dltxt="'+escA(x.id)+'">.txt</button> '))+
             '<button class="lnk del" data-del="'+escA(x.id)+'">Eliminar</button></td></tr>'; }).join("")+'</tbody></table>';
-    }, function(e){ if(msg) msg.textContent="No se pudo cargar la lista: "+e.message; list.innerHTML=""; });
+      renderSel();
+    }, function(e){ if(msg) msg.textContent="No se pudo cargar la lista: "+e.message; list.innerHTML=""; VISIBLES=[]; renderSel(); });
+  }
+  /* Selección con casillas: SEL = ids marcados; VISIBLES = ids que muestra la lista ahora mismo. */
+  function seleccionados(){ return VISIBLES.filter(function(id){ return !!SEL[id]; }); }
+  function renderSel(){
+    var n=seleccionados().length, b=$("misAbrirSel");
+    if(b){ b.disabled=(n===0); b.textContent=n?("Abrir seleccionados ("+n+")"):"Abrir seleccionados"; }
+    var all=$("misSelAll");
+    if(all&&all.tagName){ all.checked=(n>0&&n===VISIBLES.length); all.indeterminate=(n>0&&n<VISIBLES.length); }
+  }
+  function marcarTodos(on){
+    VISIBLES.forEach(function(id){ if(on) SEL[id]=true; else delete SEL[id]; });
+    var list=$("misList"); if(list&&list.querySelectorAll) Array.prototype.forEach.call(list.querySelectorAll("input[data-sel]"),function(c){ c.checked=!!on; });
+    renderSel();
   }
   function fetchOne(id){ return sb.from("reportes").select("*",{id:"eq."+id}).then(function(r){ if(!r||!r[0]) throw new Error("No se encontró el reporte (¿lo eliminaron?)"); return r[0]; }); }
   function abrir(id){
@@ -7839,9 +7860,64 @@ var misReportes=(function(){
       }
     }, function(e){ alert(e.message); });
   }
-  /* Abre DE UNA VEZ todo lo que muestra la lista (con los filtros actuales): las calibraciones van al lote
-     de la pestaña Reporte y las notificaciones a las órdenes cargadas, para elegirlas en el desplegable
-     igual que después de procesar un pegado. Lo que ya esté cargado con el mismo TAG/OT se reemplaza. */
+  /* Aplica en la app registros de la cuenta: las calibraciones van al lote de la pestaña Reporte y las
+     notificaciones a las órdenes cargadas, para elegirlas en el desplegable igual que después de procesar
+     un pegado. Lo que ya esté cargado con el mismo TAG/OT se reemplaza por lo guardado. */
+  function aplicarItems(items){
+    // De lo más antiguo a lo más nuevo, para que el lote quede en el mismo orden en que se guardó.
+    items=(items||[]).slice().sort(function(a,b){ var x=String(a.updated_at||""), y=String(b.updated_at||""); return x<y?-1:(x>y?1:0); });
+    var cal=0, noti=0, err=0;
+    items.forEach(function(x){
+      try{
+        if(x.kind==="calibracion"){
+          var st=deserializeCal(x.payload); st._cloudId=x.id; st._cloudAt=x.updated_at; st._cloudSig=JSON.stringify(serializeCal(st));
+          repBatchPut(st); cal++;
+        } else {
+          var r=deserializeNoti(x.payload); r._cloudId=x.id; r._cloudAt=x.updated_at; r._cloudSig=JSON.stringify(serializeNoti(r));
+          var kk=normTag(r.tag||""), i=-1;
+          rows.forEach(function(rr,ii){ if(String(rr.ot||"")===String(r.ot||"") && normTag(rr.tag||"")===kk) i=ii; });
+          if(i>=0) rows[i]=r; else rows.push(r);
+          noti++;
+        }
+      }catch(e){ err++; }
+    });
+    if(noti){ currentId=null; renderRows(); }
+    if(cal){
+      renderRepSelect();
+      var sel=$("repSelect"), idx=repState?REP_BATCH.indexOf(repState):-1, rm=document.getElementById("repMsg");
+      if(idx>=0){ if(sel) sel.value=String(idx); repSelectShow(idx); }
+      else {
+        repState=null; if(sel) sel.value="";
+        if(rm) rm.innerHTML=(cal===1?'Se abrió <b>1</b> reporte guardado':'Se abrieron <b>'+cal+'</b> reportes guardados')+' en tu cuenta. Elige uno en el desplegable para editarlo.';
+        repRenderForm();
+      }
+    }
+    var msg=$("misMsg"), partes=[];
+    if(cal) partes.push(cal+(cal===1?" calibración":" calibraciones"));
+    if(noti) partes.push(noti+(noti===1?" notificación":" notificaciones"));
+    var dan=err?(err===1?" 1 no se pudo abrir (datos dañados).":(" "+err+" no se pudieron abrir (datos dañados).")):"";
+    if(msg) msg.textContent=partes.length
+      ? (((cal+noti)===1?"Se abrió ":"Se abrieron ")+partes.join(" y ")+"."+dan+
+         (noti?" Las notificaciones quedaron en el desplegable de la pestaña Notificaciones.":""))
+      : ("No se pudo abrir ninguno."+dan);
+    if(cal) switchTab("reporte"); else if(noti) switchTab("noti");
+    return {cal:cal,noti:noti,err:err};
+  }
+  /* Cuántos de estos registros reemplazarían algo que ya está cargado en la app. */
+  function yaCargados(items){
+    var n=0;
+    (items||[]).forEach(function(x){
+      if(x.kind==="calibracion"){
+        var k=normTag((x.payload&&x.payload.tag)||x.tag||"");
+        if(REP_BATCH.some(function(s){ return normTag(s.rec.tag)===k; })) n++;
+      } else {
+        var kk=normTag(x.tag||"");
+        if(rows.some(function(r){ return String(r.ot||"")===String(x.ot||"") && normTag(r.tag||"")===kk; })) n++;
+      }
+    });
+    return n;
+  }
+  /* Abre DE UNA VEZ todo lo que muestra la lista (con los filtros actuales). */
   function abrirTodos(){
     var msg=$("misMsg"), btn=$("misAbrirTodos");
     if(!sb.isOnline()){ if(msg) msg.textContent="Sin conexión: no se puede abrir lo guardado en tu cuenta."; return Promise.resolve(); }
@@ -7849,45 +7925,37 @@ var misReportes=(function(){
     if(msg) msg.textContent="Abriendo…";
     function fin(){ if(btn) btn.disabled=false; }
     return sb.from("reportes").select("*",filtrosActuales()).then(function(items){
-      // De lo más antiguo a lo más nuevo, para que el lote quede en el mismo orden en que se guardó.
-      items=(items||[]).slice().reverse();
+      items=items||[];
       if(!items.length){ if(msg) msg.textContent="No hay nada guardado para abrir."; fin(); return; }
       if(!confirm("Se abrirán "+items.length+" reporte(s) guardado(s) para editarlos.\n\nLo que ya tengas cargado con el mismo TAG (calibración) o la misma orden (notificación) se reemplaza por lo guardado en tu cuenta.\n\n¿Continuar?")){ if(msg) msg.textContent=""; fin(); return; }
-      var cal=0, noti=0, err=0;
-      items.forEach(function(x){
-        try{
-          if(x.kind==="calibracion"){
-            var st=deserializeCal(x.payload); st._cloudId=x.id; st._cloudAt=x.updated_at; st._cloudSig=JSON.stringify(serializeCal(st));
-            repBatchPut(st); cal++;
-          } else {
-            var r=deserializeNoti(x.payload); r._cloudId=x.id; r._cloudAt=x.updated_at; r._cloudSig=JSON.stringify(serializeNoti(r));
-            var kk=normTag(r.tag||""), i=-1;
-            rows.forEach(function(rr,ii){ if(String(rr.ot||"")===String(r.ot||"") && normTag(rr.tag||"")===kk) i=ii; });
-            if(i>=0) rows[i]=r; else rows.push(r);
-            noti++;
-          }
-        }catch(e){ err++; }
-      });
-      if(noti){ currentId=null; renderRows(); }
-      if(cal){
-        renderRepSelect();
-        var sel=$("repSelect"), idx=repState?REP_BATCH.indexOf(repState):-1, rm=document.getElementById("repMsg");
-        if(idx>=0){ if(sel) sel.value=String(idx); repSelectShow(idx); }
-        else {
-          repState=null; if(sel) sel.value="";
-          if(rm) rm.innerHTML=(cal===1?'Se abrió <b>1</b> reporte guardado':'Se abrieron <b>'+cal+'</b> reportes guardados')+' en tu cuenta. Elige uno en el desplegable para editarlo.';
-          repRenderForm();
-        }
-      }
-      var partes=[];
-      if(cal) partes.push(cal+(cal===1?" calibración":" calibraciones"));
-      if(noti) partes.push(noti+(noti===1?" notificación":" notificaciones"));
-      var dan=err?(err===1?" 1 no se pudo abrir (datos dañados).":(" "+err+" no se pudieron abrir (datos dañados).")):"";
-      if(msg) msg.textContent=partes.length
-        ? (((cal+noti)===1?"Se abrió ":"Se abrieron ")+partes.join(" y ")+"."+dan+
-           (noti?" Las notificaciones quedaron en el desplegable de la pestaña Notificaciones.":""))
-        : ("No se pudo abrir ninguno."+dan);
-      if(cal) switchTab("reporte"); else if(noti) switchTab("noti");
+      aplicarItems(items); fin();
+    }, function(e){ if(msg) msg.textContent="No se pudo abrir: "+e.message; fin(); });
+  }
+  /* Trae del servidor los registros de esos ids (en lotes, para no armar una URL enorme). */
+  function fetchIds(ids){
+    var out=[], i=0;
+    function next(){
+      if(i>=ids.length) return Promise.resolve(out);
+      var lote=ids.slice(i,i+40); i+=40;
+      return sb.from("reportes").select("*",{id:"in.("+lote.join(",")+")"}).then(function(r){ out=out.concat(r||[]); return next(); });
+    }
+    return next();
+  }
+  /* Abre SOLO los marcados con la casilla. Pregunta únicamente si alguno reemplaza algo ya cargado. */
+  function abrirSeleccionados(){
+    var msg=$("misMsg"), btn=$("misAbrirSel"), ids=seleccionados();
+    if(!ids.length){ if(msg) msg.textContent="Marca con la casilla los reportes que quieras abrir."; return Promise.resolve(); }
+    if(!sb.isOnline()){ if(msg) msg.textContent="Sin conexión: no se puede abrir lo guardado en tu cuenta."; return Promise.resolve(); }
+    if(btn) btn.disabled=true;
+    if(msg) msg.textContent="Abriendo "+ids.length+"…";
+    function fin(){ renderSel(); }
+    return fetchIds(ids).then(function(items){
+      items=items||[];
+      if(!items.length){ if(msg) msg.textContent="No se encontraron los seleccionados (¿los eliminaron?)."; fin(); return; }
+      var ya=yaCargados(items);
+      if(ya && !confirm(ya+" de los seleccionados ya "+(ya===1?"está cargado":"están cargados")+" aquí y se "+(ya===1?"reemplazará":"reemplazarán")+" por lo guardado en tu cuenta.\n\n¿Continuar?")){ if(msg) msg.textContent=""; fin(); return; }
+      aplicarItems(items);
+      marcarTodos(false);   // ya están abiertos: se limpia la selección
       fin();
     }, function(e){ if(msg) msg.textContent="No se pudo abrir: "+e.message; fin(); });
   }
@@ -7914,6 +7982,9 @@ var misReportes=(function(){
   }
   function wire(){
     var ml=$("misList"); if(ml) ml.addEventListener("click",function(e){
+      var c=e.target;
+      if(c&&c.getAttribute&&c.getAttribute("data-sel")){ var sid=c.getAttribute("data-sel"); if(c.checked) SEL[sid]=true; else delete SEL[sid]; renderSel(); return; }
+      if(c&&c.id==="misSelAll"){ marcarTodos(!!c.checked); return; }
       var t=(e.target&&e.target.closest)?e.target.closest("[data-open],[data-dlpdf],[data-dljson],[data-dltxt],[data-del]"):null; if(!t) return;
       var id;
       if((id=t.getAttribute("data-open"))) abrir(id);
@@ -7931,6 +8002,7 @@ var misReportes=(function(){
     ["misKind","misUser"].forEach(function(id){ var s=$(id); if(s) s.addEventListener("change",function(){ listar(); }); });
     var mr=$("misRefresh"); if(mr) mr.addEventListener("click",function(){ listar(); });
     var ma=$("misAbrirTodos"); if(ma) ma.addEventListener("click",function(){ abrirTodos(); });
+    var ms=$("misAbrirSel"); if(ms) ms.addEventListener("click",function(){ abrirSeleccionados(); });
     var bn=$("btnNubeTodas"); if(bn) bn.addEventListener("click",function(){ guardarNotiTodas(); });
     var g1=$("repGuardarNube"); if(g1) g1.addEventListener("click",function(){ guardarCal(repState); });
     var g2=$("repGuardarNubeTodos"); if(g2) g2.addEventListener("click",function(){ guardarCalTodos(); });
@@ -7938,7 +8010,8 @@ var misReportes=(function(){
   wire();
   return { serializeCal:serializeCal, deserializeCal:deserializeCal, serializeNoti:serializeNoti, deserializeNoti:deserializeNoti,
            itemCal:itemCal, itemNoti:itemNoti, guardar:guardar, guardarCal:guardarCal, guardarCalTodos:guardarCalTodos, guardarNoti:guardarNoti, guardarNotiTodas:guardarNotiTodas,
-           flushPending:flushPending, listar:listar, abrir:abrir, abrirTodos:abrirTodos, eliminar:eliminar, renderRepStatus:renderRepStatus, renderPend:renderPend,
+           flushPending:flushPending, listar:listar, abrir:abrir, abrirTodos:abrirTodos, abrirSeleccionados:abrirSeleccionados,
+           seleccionar:function(id,on){ if(on) SEL[id]=true; else delete SEL[id]; renderSel(); }, seleccionados:seleccionados, eliminar:eliminar, renderRepStatus:renderRepStatus, renderPend:renderPend,
            updatePendBadge:function(){ updatePendBadge(loadQ()); }, pendientes:function(){ return myQ(); },
            sinGuardar:sinGuardar, guardarLista:guardarLista };
 })();

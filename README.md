@@ -153,13 +153,19 @@ La app pide **iniciar sesión** (correo y contraseña). Funciona así:
 4. **Guardar en mi cuenta**: cada notificación (botón de la orden o *Guardar todas en mi cuenta*) y cada
    reporte de calibración (*Guardar en mi cuenta* / *Guardar todos en mi cuenta*) se guardan en la nube
    atribuidos a tu usuario. Volver a guardar la misma orden/TAG **actualiza** el registro (no duplica).
-5. **Mis reportes**: lista lo guardado (tipo, TAG, OT, fecha). **Abrir** lo carga en su pestaña para seguir
-   editando; **Abrir todos** trae de una vez todo lo que muestra la lista (respeta el filtro de tipo y, si
-   eres administrador, el de usuario): las calibraciones vuelven al **desplegable de instrumentos** y las
-   notificaciones al **desplegable de órdenes**, para elegirlas y editarlas igual que después de procesar un
-   pegado. Lo que ya tengas cargado con el mismo TAG (calibración) o la misma orden (notificación) se
-   reemplaza por lo guardado en tu cuenta. **PDF / JSON / .txt** lo descargan tal como se guardó;
-   **Eliminar** lo borra. El administrador ve los reportes de **todos** los usuarios (con filtro por usuario).
+5. **Mis reportes**: lista lo guardado (tipo, TAG, OT, fecha; los 1.000 más recientes). Para volver a
+   trabajar en reportes viejos:
+   - **Casillas + Abrir seleccionados**: marca los que quieras (la casilla de la cabecera marca todos los de
+     la lista) y pulsa **Abrir seleccionados (N)**. Es la vía cómoda para rescatar unos pocos de hace meses.
+   - **Abrir todos**: trae de una vez todo lo que muestra la lista (respeta el filtro de tipo y, si eres
+     administrador, el de usuario).
+   - **Abrir** (en la fila): carga uno solo.
+
+   En los tres casos las calibraciones vuelven al **desplegable de instrumentos** y las notificaciones al
+   **desplegable de órdenes**, para elegirlas y editarlas igual que después de procesar un pegado. Lo que ya
+   tengas cargado con el mismo TAG (calibración) o la misma orden (notificación) se reemplaza por lo guardado
+   en tu cuenta (te avisa antes). **PDF / JSON / .txt** lo descargan tal como se guardó; **Eliminar** lo
+   borra. El administrador ve los reportes de **todos** los usuarios (con filtro por usuario).
 6. **Sin internet**: si ya iniciaste sesión en ese navegador, entras igual y puedes generar `.txt`/PDF/ZIP.
    Al guardar aparece *"pendiente de subir"*; se **sube solo al volver la conexión** (o con *Reintentar
    ahora* en Mis reportes). Iniciar sesión por primera vez y consultar Mis reportes sí requieren internet.

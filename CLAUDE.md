@@ -353,14 +353,20 @@ repo**), `AUTH_KEY="noti_auth_v1"`, `PENDING_KEY="noti_pending_v1"`, `CURRENT_US
   no se encola, `_cloudError`. Estado visible con `cloudBadge(row)` (cardHtml) y `#repNubeMsg`
   (`renderRepStatus`). `listar/abrir/abrirTodos/dlPdf/dlJson/dlTxt/eliminar` en la pestaña **Mis reportes**
   (`switchTab("mis")`); `abrir` usa `repBatchPut` (reemplaza en `REP_BATCH` por TAG) y `repSelectShow`.
-  **`abrirTodos`** (botón `#misAbrirTodos`, "Abrir todos"): un solo `select("*")` con `filtrosActuales()`
-  (los mismos filtros de tipo/usuario que usa `listar`; lo comparten ambos), pide confirmación y aplica los
-  payloads **del más antiguo al más nuevo** (`items.reverse()`, así el lote queda en el orden en que se
-  guardó) — calibraciones con `repBatchPut` + `renderRepSelect`, notificaciones reemplazando por `ot`+`tag`
-  o `push` + `renderRows` — fija `_cloudId/_cloudAt/_cloudSig` (no cuentan como trabajo sin guardar),
-  **deja el desplegable sin selección** (como tras el primer pegado; si `repState` sigue en el lote la
-  conserva), pasa a la pestaña Reporte si hubo calibraciones y resume en `#misMsg`. Un payload dañado se
-  cuenta aparte y no corta el resto.
+  **`aplicarItems(items)`**: núcleo común de abrir lo guardado. Ordena **del más antiguo al más nuevo** por
+  `updated_at` (así el lote queda en el orden en que se guardó) y aplica los payloads — calibraciones con
+  `repBatchPut` + `renderRepSelect`, notificaciones reemplazando por `ot`+`tag` o `push` + `renderRows` —,
+  fija `_cloudId/_cloudAt/_cloudSig` (no cuentan como trabajo sin guardar), **deja el desplegable sin
+  selección** (como tras el primer pegado; si `repState` sigue en el lote la conserva), pasa a la pestaña
+  Reporte si hubo calibraciones y resume en `#misMsg`. Un payload dañado se cuenta aparte y no corta el resto.
+  **`abrirTodos`** (botón `#misAbrirTodos`): un `select("*")` con `filtrosActuales()` (los mismos filtros de
+  tipo/usuario que usa `listar`; `limit:1000`), pide confirmación y llama a `aplicarItems`.
+  **Selección con casillas** (`SEL` = ids marcados, `VISIBLES` = ids que muestra la lista): cada fila lleva
+  `<input type="checkbox" data-sel="id">` y la cabecera `#misSelAll` (marcar/desmarcar todos; `indeterminate`
+  si van algunos). `renderSel` actualiza el botón `#misAbrirSel` ("Abrir seleccionados (N)", deshabilitado con
+  0). `listar` poda `SEL` a lo visible. **`abrirSeleccionados`**: `fetchIds` trae los marcados en **lotes de 40**
+  (`id=in.(…)`, para no armar URLs enormes), pregunta **solo** si alguno reemplaza algo ya cargado
+  (`yaCargados`), aplica y limpia la selección. API: `seleccionar(id,on)` / `seleccionados()`.
   El botón "Guardar" de cada notificación pasó a **"Guardar en mi cuenta"** (marca `saved` + `guardarNoti`);
   botones nuevos `#btnNubeTodas`, `#repGuardarNube`, `#repGuardarNubeTodos`.
 - **`adminUsers`** (solo `auth.isAdmin()`): pestaña **Usuarios** (`#tabAdmin`, oculta si no es admin):
@@ -459,10 +465,11 @@ Desde el login, el stub debe proveer `localStorage`, `sessionStorage`, `navigato
 la red). **`node mdbwriter/test/app/correr.js`** extrae el JS de `index.html` y corre `e2e_auth.js`, `e2e_nube_node.js`
 (respaldo en la nube: `sb.req` binario, reintentos, 403, gzip, huella) y `e2e_datos_node.js` (datos compartidos: no
 retroceder, publicar, nube más nueva, pendiente sin red, sincronizar, lote editado), `e2e_salida_node.js` (trabajo sin
-guardar y aviso al cerrar) y `e2e_abrir_node.js` ("Abrir todos": orden del lote, sin duplicar, filtros, cancelar,
-sin conexión, lista vacía, payload dañado). En Chrome real: `node mdbwriter/test/e2e_abrir.js <index.html|URL>
+guardar y aviso al cerrar) y `e2e_abrir_node.js` ("Abrir todos" y "Abrir seleccionados": orden del lote, sin duplicar,
+filtros, cancelar, sin conexión, lista vacía, payload dañado, casillas, aviso de reemplazo, lotes de 40).
+En Chrome real: `node mdbwriter/test/e2e_abrir.js <index.html|URL>
 <carpeta>` (guardar un lote en la cuenta → vaciar la app → "Abrir todos" → elegir en los desplegables, editar y
-volver a guardar sin duplicar) y `node mdbwriter/test/e2e_salida.js <index.html|URL> <copia.mdb> <carpeta>`
+volver a guardar sin duplicar; y marcar casillas → "Abrir seleccionados" abre solo esos) y `node mdbwriter/test/e2e_salida.js <index.html|URL> <copia.mdb> <carpeta>`
 (orden de tarjetas; aviso `beforeunload` con clic real para la activación del usuario; quedarse → ventana; guardar
 todo; sin conexión; base sin descargar; salir igual; cerrar sesión). El arnés `e2e_auth.js` cubre: gate sin caché, arranque con caché, autollenado,
 round-trip calibración/notificación, wrapper `sb` (errores legibles, 401→refresh→reintento, offline,

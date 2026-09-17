@@ -43,9 +43,11 @@ const mock = http.createServer(async (req, res) => {
   }
   if (ruta === "/rest/v1/reportes" && m === "GET") {
     nube.gets.push(u.search);
-    const id = (u.searchParams.get("id") || "").replace("eq.", ""), kind = (u.searchParams.get("kind") || "").replace("eq.", "");
+    const idf = u.searchParams.get("id") || "", kind = (u.searchParams.get("kind") || "").replace("eq.", "");
     let r = nube.filas.slice().sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1));   // updated_at.desc
-    if (id) r = r.filter(f => f.id === id);
+    const mIn = idf.match(/^in\.\((.*)\)$/);
+    if (mIn) { const ids = mIn[1].split(","); r = r.filter(f => ids.indexOf(f.id) >= 0); }
+    else if (idf.indexOf("eq.") === 0) r = r.filter(f => f.id === idf.slice(3));
     if (kind) r = r.filter(f => f.kind === kind);
     return json(200, r);
   }
@@ -167,6 +169,34 @@ async function main() {
   await esperar("/Se abrieron 3 calibraciones\\./.test(document.getElementById('misMsg').textContent)", 30000, "abrir solo calibraciones");
   ok(nube.gets.some(q => /kind=eq\.calibracion/.test(q)), "la consulta llevó el filtro de tipo");
   ok(await ev("REP_BATCH.length===3 && rows.length===3"), "no se duplicó nada al reabrir");
+
+  console.log("\n[6] Casillas: abrir solo los seleccionados");
+  // Se deja la app en blanco otra vez para ver qué entra exactamente.
+  await ev("switchTab('reporte'); document.getElementById('repLimpiar').click(); true");
+  await esperar("REP_BATCH.length===0", 10000, "lote vaciado");
+  await ev("switchTab('noti'); document.getElementById('btnClearSession').click(); true");
+  await esperar("rows.length===0", 10000, "sesión vaciada");
+  await ev("switchTab('mis'); var s=document.getElementById('misKind'); s.value=''; s.dispatchEvent(new Event('change',{bubbles:true})); true");
+  await esperar("document.querySelectorAll('#misList input[data-sel]').length===6", 20000, "lista con casillas");
+  ok(true, "cada fila de la lista tiene su casilla (6)");
+  ok(await ev("document.getElementById('misAbrirSel').disabled===true"), "'Abrir seleccionados' arranca deshabilitado");
+  // Marca con un clic real la calibración de PT-U7122 y la notificación de la orden 21000002.
+  const marcados = await ev(`(function(){ var out=[]; Array.from(document.querySelectorAll('#misList tbody tr')).forEach(function(tr){ var t=tr.textContent;
+      if(/PT-U7122/.test(t) && /Calibración/.test(t)) out.push(tr.querySelector('input[data-sel]'));
+      if(/21000002/.test(t) && /Notificación/.test(t)) out.push(tr.querySelector('input[data-sel]')); });
+    out.forEach(function(c){ c.click(); }); return out.length; })()`);
+  ok(marcados === 2, "se marcaron 2 casillas");
+  ok(await ev("document.getElementById('misAbrirSel').textContent") === "Abrir seleccionados (2)", "el botón cuenta los marcados");
+  await ev("document.getElementById('misAbrirSel').click(); true");
+  await esperar("REP_BATCH.length===1 && rows.length===1", 30000, "abrir seleccionados");
+  ok(await ev("REP_BATCH[0].rec.tag==='PT-U7122' && String(rows[0].ot)==='21000002'"), "abrió exactamente los dos marcados");
+  ok(await ev("document.getElementById('misAbrirSel').disabled===true"), "tras abrirlos la selección queda limpia");
+  // La casilla de la cabecera marca todo lo de la lista.
+  await ev("switchTab('mis'); true"); await sleep(800);
+  await ev("document.getElementById('misSelAll').click(); true");
+  ok(await ev("document.getElementById('misAbrirSel').textContent") === "Abrir seleccionados (6)", "la casilla de la cabecera marca los 6");
+  await ev("document.getElementById('misSelAll').click(); true");
+  ok(await ev("document.getElementById('misAbrirSel').disabled===true"), "y vuelve a desmarcarlos");
 
   ok(errores.length === 0, "sin errores de JavaScript en consola" + (errores.length ? ": " + errores.join(" | ") : ""));
   console.log("\nRESULTADO ABRIR NAVEGADOR: " + pass + " OK, " + fail + " FAIL");
