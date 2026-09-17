@@ -12,8 +12,8 @@ A partir de una tabla de Órdenes de Trabajo (columna **OT** + **denominación d
 asocia cada TAG a su **procedimiento P-SG-…** y genera una **plantilla de notificación `.txt`** por orden.
 Entrada por Excel o por pegado. Única dependencia de red: la API REST de Supabase (sin librería; wrapper
 `sb` sobre `fetch`). Cuatro pestañas arriba:
-**Notificaciones** (UI en tres tarjetas: **01 Cargar datos** y **02 Mapeo** lado a lado con `.toprow`, y
-**03 Notificaciones** a ancho completo debajo), **Reporte de calibración** (generador del informe DPCTrack
+**Notificaciones** (UI en tres tarjetas a ancho completo, una debajo de otra: **01 Cargar datos**, **02 Notificaciones**
+y, al final porque se usa poco, **03 Mapeo** (`#mapCard`)), **Reporte de calibración** (generador del informe DPCTrack
 en PDF a partir de un TAG; ver sección de arquitectura), **Mis reportes** (lo guardado en la cuenta) y
 **Usuarios** (solo admin: aprobar/revocar). Toda la app queda tras un **gate de login** (ver *Auth*).
 
@@ -123,7 +123,7 @@ está en medio y el archivo se regenera).
 - **Auto-guardado de sesión** (`SESSION_KEY`=`noti_session_v1`, `saveSession`/`loadSession`/`clearSession`):
   las filas cargadas y sus ediciones se guardan en `localStorage` en cada render y edición (debounce), y se
   restauran al abrir. Al restaurar se re-ejecuta `recompAuto` (respeta lo editado, re-sincroniza autos con
-  la base vigente). Botón **"Vaciar sesión"** en la tarjeta 03.
+  la base vigente). Botón **"Vaciar sesión"** en la tarjeta 02 (Notificaciones).
 - `autoTecnico(row)` + campo **"Trabajo realizado por:"** (penúltima línea del `.txt`): nombre del técnico
   del último reporte de calibración (`WHOCALIBRATED`, campo `by`), **solo si ese reporte es reciente**
   (menos de 2 meses respecto a `row.fecha`). Si es antiguo (≥2 meses), faltan fechas o el TAG no está en
@@ -131,7 +131,7 @@ está en medio y el archivo se regenera).
   `d` = fecha del reporte (yyyy-MM-dd); `parseDMY`/`parseISO`/`addMonths` hacen la comparación.
 - Campo **"Trabajo recibido por:"** (última línea del `.txt`, `fields.recibido`): **manual**, arranca vacío
   y no se autocalcula (quien recibe/acepta el trabajo). Editable; se persiste con la sesión.
-- **Actualizar los datos sin reconstruir** (`CAL_OVERRIDE` / `CAL_STORE_KEY` / tarjeta 02 "Base de
+- **Actualizar los datos sin reconstruir** (`CAL_OVERRIDE` / `CAL_STORE_KEY` / tarjeta 03 Mapeo → "Base de
   calibración"): `src/extract_ranges.ps1` también genera `datos_calibracion.json`; el usuario lo adjunta
   en el dashboard (input `importCalib`), se guarda en `localStorage` y **manda sobre los datos
   incrustados** (para TAG que no incluya, cae a `TAG_RANGES`). "Volver a incrustados" = `btnCalibReset`.
@@ -294,11 +294,23 @@ está en medio y el archivo se regenera).
   `detectColIdx` (pegado, por índice), compartiendo los matchers `COL`. Sin encabezados, el pegado separa
   OT (bloque de ≥4 dígitos), fecha (por forma) y denominación (el resto), incluso si todo viene en una
   sola línea separada por espacios.
-- Gestión de mapeo (tarjeta **02**, junto a "Cargar datos"): agregar/editar/borrar prefijos; se guarda en
+- Gestión de mapeo (tarjeta **03 · Mapeo**, `#mapCard`, al FINAL de la pestaña Notificaciones): agregar/editar/borrar prefijos; se guarda en
   `localStorage` (`STORE_KEY`), con exportar/importar JSON y restablecer.
-- Layout: `.toprow` (grid 2 col) coloca **01 Cargar datos** y **02 Mapeo** lado a lado; debajo, a ancho
-  completo, **03 Notificaciones** (`#resultsCard`) que solo aparece al cargar datos y muestra una plantilla
-  únicamente cuando se elige una orden del desplegable. En pantallas < 820px la fila superior se apila.
+- Layout (pestaña Notificaciones): tres tarjetas a ancho completo en este orden: **01 Cargar datos**, **02 Notificaciones**
+  (`#resultsCard`, solo aparece al cargar datos y muestra una plantilla únicamente cuando se elige una orden) y
+  **03 Mapeo** (`#mapCard`, incluye "Base de calibración"). Ya no existe `.toprow`.
+- **Aviso al cerrar la página** (módulo `avisoSalida`, ventana `#salidaModal`): los navegadores no permiten una ventana
+  propia al cerrar, así que en `beforeunload`, si hay trabajo sin guardar, se pide el aviso estándar
+  (`preventDefault` + `returnValue`) y se programa `setTimeout(mostrar)`, que solo corre si el usuario elige
+  **quedarse**. Antes guarda la sesión local (`saveSession`). "Trabajo sin guardar" = filas/reportes con `_tocado`
+  (se marca en los listeners de edición de `#rows` y `#repForm`, patrones, técnico para todos) cuyo
+  `JSON.stringify(payload)` no coincide con `_cloudSig` (lo guardado en la cuenta; lo fijan `guardar`,
+  `flushPending` y `abrir`) ni con `_cloudSigQ` (lo encolado sin conexión), más `dbGrabar.pendienteSalida()`
+  (grabando o base actualizada sin descargar). `misReportes.sinGuardar()` / `guardarLista(notis, cals)` (sin alertas).
+  Botones: **Guardar todo en mi cuenta**, **Descargar base actualizada**, **Seguir trabajando** y, si se abrió desde
+  "Cerrar sesión" (`avisoSalida.mostrar(true)`), **Cerrar sesión sin guardar**. `auth.logout` llama
+  `avisoSalida.permitirSalida()` para que la recarga propia no avise. Órdenes cargadas sin editar NO cuentan (la
+  sesión local ya las conserva).
 
 ## Auth y guardado por usuario (Supabase)
 Bloque al final de `src/part_tail.html` (entre el IIFE de wiring y el Init). Config pública tras `var uid=0;`:
@@ -420,7 +432,7 @@ repo**), `AUTH_KEY="noti_auth_v1"`, `PENDING_KEY="noti_pending_v1"`, `CURRENT_US
 - **UI/estilos**: editar `src/part_head.html` (CSS/markup) o `src/part_tail.html` (lógica) → `build.ps1`.
 - **Cambiar/añadir el procedimiento de un prefijo** de forma permanente: editar `DEFAULT_MAP_ARR` en
   `src/part_tail.html` (o `build_config.py` si viene de NotebookLM) → subir `STORE_KEY` → `build.ps1`.
-  (Para cambios puntuales sin recompilar, el usuario también puede usar la tarjeta 02 "Mapeo" de la UI.)
+  (Para cambios puntuales sin recompilar, el usuario también puede usar la tarjeta 03 "Mapeo" de la UI.)
 - **Regenerar el mapeo desde NotebookLM** (si cambian los PDFs): ver siguiente sección, luego
   `python src/build_config.py` (reescribe `part_tail.html`) y `build.ps1`.
 
@@ -438,7 +450,10 @@ Desde el login, el stub debe proveer `localStorage`, `sessionStorage`, `navigato
 `window.addEventListener` y un `fetch` simulado (`auth.init` corre al cargar; sin caché de sesión NO llama a
 la red). **`node mdbwriter/test/app/correr.js`** extrae el JS de `index.html` y corre `e2e_auth.js`, `e2e_nube_node.js`
 (respaldo en la nube: `sb.req` binario, reintentos, 403, gzip, huella) y `e2e_datos_node.js` (datos compartidos: no
-retroceder, publicar, nube más nueva, pendiente sin red, sincronizar, lote editado). El arnés `e2e_auth.js` cubre: gate sin caché, arranque con caché, autollenado,
+retroceder, publicar, nube más nueva, pendiente sin red, sincronizar, lote editado) y `e2e_salida_node.js` (trabajo sin
+guardar y aviso al cerrar). En Chrome real: `node mdbwriter/test/e2e_salida.js <index.html|URL> <copia.mdb> <carpeta>`
+(orden de tarjetas; aviso `beforeunload` con clic real para la activación del usuario; quedarse → ventana; guardar
+todo; sin conexión; base sin descargar; salir igual; cerrar sesión). El arnés `e2e_auth.js` cubre: gate sin caché, arranque con caché, autollenado,
 round-trip calibración/notificación, wrapper `sb` (errores legibles, 401→refresh→reintento, offline,
 refresco proactivo, upsert), cola offline, pendiente/revocado/sesión inválida, offline con caché y `owner`.
 El JS de la app se extrae de `index.html` (2º `<script>`) y se prueba con Node + stub de DOM en el

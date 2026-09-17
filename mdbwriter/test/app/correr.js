@@ -11,7 +11,7 @@ const chk = spawnSync(process.execPath, ["--check", path.join(__dirname, "app_ch
 if (chk.status !== 0) { console.log("Sintaxis inválida:\n" + chk.stderr); process.exit(1); }
 console.log("sintaxis de la app: OK");
 let fallos = 0;
-for (const f of ["e2e_auth.js", "e2e_nube_node.js", "e2e_datos_node.js"]) {
+for (const f of ["e2e_auth.js", "e2e_nube_node.js", "e2e_datos_node.js", "e2e_salida_node.js"]) {
   const r = spawnSync(process.execPath, [path.join(__dirname, f)], { encoding: "utf8", timeout: 300000 });
   const lineas = (r.stdout || "").split("\n");
   const resumen = lineas.filter(l => /RESUMEN/.test(l)).pop() || ("(sin resumen) " + (r.stderr || "").slice(0, 300));

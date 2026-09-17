@@ -14,8 +14,8 @@ guardado en la nube*.
 Los datos de calibración vienen **incrustados** en `index.html` y pueden **actualizarse a futuro**
 adjuntando un archivo (ver *Base de calibración* más abajo).
 
-La interfaz tiene tres tarjetas: arriba, lado a lado, **01 · Cargar datos** y **02 · Mapeo TAG →
-Procedimiento**; debajo, a ancho completo, **03 · Notificaciones** (aparece al cargar datos). El diseño
+La pestaña Notificaciones tiene tres tarjetas, una debajo de otra: **01 · Cargar datos**, **02 ·
+Notificaciones** (aparece al cargar datos) y, al final, **03 · Mapeo TAG → Procedimiento** (se usa poco). El diseño
 sigue una estética de minimalismo editorial (paleta cálida monocroma, tipografía serif en títulos, sin
 gradientes ni sombras marcadas).
 
@@ -34,7 +34,7 @@ La app tiene **cuatro pestañas** arriba: **Notificaciones** (generar las planti
      las demás columnas. Si pegas sin encabezados, asume col 1 = OT y col 2 = denominación.
    Si la tabla trae la **fecha**, se usa como fecha de inicio **y de fin**. También se ignora la columna
    de **tipo de orden** (p. ej. `EI-5`) para que no se confunda con el TAG.
-3. Debajo aparece la tarjeta **03 · Notificaciones** con un **desplegable con todas las órdenes**
+3. Debajo aparece la tarjeta **02 · Notificaciones** con un **desplegable con todas las órdenes**
    (cada opción muestra **OT · TAG · nombre · procedimiento**, y ✓ si ya está guardada).
    **Al inicio no se muestra ninguna plantilla**: elige una orden de la lista y recién ahí verás
    **solo esa plantilla**, con sus campos editables:
@@ -56,13 +56,19 @@ La app tiene **cuatro pestañas** arriba: **Notificaciones** (generar las planti
      descargará; se actualiza mientras editas. Vuelve a pulsar para ocultarla.
    - Edita los campos y pulsa **Guardar en mi cuenta** (la orden queda marcada con ✓ en el desplegable,
      avanza el contador "X de N guardadas" y la notificación se **guarda en tu cuenta** en la nube; el badge
-     ☁ indica si ya subió o quedó pendiente). **Guardar todas en mi cuenta** (tarjeta 03) las sube todas.
+     ☁ indica si ya subió o quedó pendiente). **Guardar todas en mi cuenta** (tarjeta 02) las sube todas.
      Elige otra orden en el desplegable y repite.
    - En la orden abierta puedes **Copiar al portapapeles** toda la plantilla o **Descargar este `.txt`**
      (nombre `OT-TAG.txt`).
    - Cuando termines, **Descargar todos (.zip)** genera todas las plantillas en un ZIP.
    - **Tu trabajo se guarda solo**: las órdenes cargadas y las ediciones se conservan en el navegador y se
-     **restauran al reabrir**. **Vaciar sesión** (tarjeta 03) empieza de cero.
+     **restauran al reabrir**. **Vaciar sesión** (tarjeta 02) empieza de cero.
+   - **Al cerrar la página con trabajo sin guardar en tu cuenta** (notificaciones o reportes de calibración que
+     editaste, o una base grabada en línea sin descargar), el navegador pregunta si quieres salir. Si eliges
+     **quedarte**, se abre la ventana **"Guarda tu trabajo antes de salir"** con la lista de lo pendiente y el botón
+     **Guardar todo en mi cuenta** (y **Descargar base actualizada** si aplica). Los navegadores no permiten mostrar
+     esa ventana en el mismo momento de cerrar, por eso primero aparece su aviso estándar. **Cerrar sesión** con
+     trabajo sin guardar abre la misma ventana (con *Cerrar sesión sin guardar*).
 
 ## Reporte de calibración (pestaña 2)
 Genera el **INSTRUMENTO INFORME DE CALIBRACIÓN** en PDF, con la **misma estructura** que el que produce
@@ -130,7 +136,7 @@ líneas de ajuste de cero** (las de *verificación de cero* se conservan). En el
 las líneas empiezan con un punto (`.`)**. El flujo es idéntico para Excel y pegado:
 ambos muestran las plantillas editables (y las mismas preguntas/desplegables) antes de descargar.
 
-En la tarjeta **02 · Mapeo** puedes agregar/corregir prefijos, **exportar/importar** el mapeo
+En la tarjeta **03 · Mapeo** (al final de la pestaña Notificaciones) puedes agregar/corregir prefijos, **exportar/importar** el mapeo
 como JSON y **restablecer**. Los cambios se guardan en tu navegador (localStorage, clave `noti_mapping_v12`).
 El **TAG** es el primer dato que mezcla letras y números (p. ej. `PT-3110`, `3110-PT-001`, `PT-U2411`),
 aunque lleve delante el código de área o de planta.
@@ -189,7 +195,7 @@ Estos datos (y los **reportes que se abren por defecto** al poner una orden o un
 `index.html` desde la base DPCTrack2, pero **se mantienen actualizados solos para todos los usuarios**:
 - **Al grabar en línea** ("Grabar a la base de datos", Opción 1), la página lee los datos de la base **ya
   actualizada** y los comparte en la nube (un único archivo privado, solo usuarios aprobados).
-- **Tarjeta 02 · Base de calibración → "Actualizar desde base .mdb"**: eliges una base y solo se leen sus datos
+- **Tarjeta 03 · Mapeo → Base de calibración → "Actualizar desde base .mdb"**: eliges una base y solo se leen sus datos
   (la base no se modifica); también se comparten. Útil si se calibró directo en DPCTrack.
 - Cada técnico recibe los datos compartidos **al abrir la app** (y al volver la conexión). Sin internet sigue con
   los últimos que recibió; lo que se leyó sin conexión se comparte después.
@@ -202,7 +208,7 @@ Alternativa manual (sin nube), como antes:
    ```
    powershell -ExecutionPolicy Bypass -File src\extract_ranges.ps1 -Mdb "ruta\base_nueva.mdb" -Password "<clave>"
    ```
-2. En la tarjeta **02 · Mapeo → Base de calibración**, **adjunta** ese `datos_calibracion.json`. Se guarda
+2. En la tarjeta **03 · Mapeo → Base de calibración**, **adjunta** ese `datos_calibracion.json`. Se guarda
    en tu navegador y **manda sobre los datos incrustados** (los TAG que no incluya usan los incrustados).
    "Volver a los datos incrustados" descarta el archivo adjuntado.
 
@@ -246,11 +252,11 @@ Cambios típicos:
 - **Textos, campos, colores, interfaz** → edita `src/part_head.html` (HTML/CSS) o `src/part_tail.html`
   (lógica) y reconstruye.
 - **Cambio rápido de un procedimiento/prefijo (sin recompilar)** → hazlo en la app, tarjeta
-  **02 · Mapeo** (se guarda en tu navegador; puedes exportar el JSON como respaldo).
+  **03 · Mapeo** (se guarda en tu navegador; puedes exportar el JSON como respaldo).
 - **Cambiar los valores por defecto de un prefijo de forma permanente** → edita el objeto de ese prefijo
   en `DEFAULT_MAP_ARR` dentro de `src/part_tail.html`, **sube la versión** `STORE_KEY`
   (`noti_mapping_vN` → `vN+1`, para que no quede oculto por el `localStorage` anterior) y reconstruye.
-- **Agregar un prefijo nuevo** → añádelo a `DEFAULT_MAP_ARR` (o desde la tarjeta 02 · Mapeo de la app).
+- **Agregar un prefijo nuevo** → añádelo a `DEFAULT_MAP_ARR` (o desde la tarjeta 03 · Mapeo de la app).
 - **Regenerar los procedimientos desde NotebookLM** (si cambian los PDFs de los tableros
   *notificaciones* / *notificaciones 1*): actualiza `src/answers/proc_<código>.txt`, ajusta las
   asignaciones en `src/build_config.py`, ejecuta `python src/build_config.py` (reescribe `part_tail.html`)

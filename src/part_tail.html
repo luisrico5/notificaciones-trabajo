@@ -2555,6 +2555,7 @@ rowsEl.addEventListener("input", function(e){
   var el=e.target, id=el.getAttribute("data-id"), f=el.getAttribute("data-f");
   if(!id||!f) return;
   var row=rows.filter(function(r){ return r.id==id; })[0]; if(!row) return;
+  row._tocado=true;   // editada: cuenta para el aviso al cerrar si no está guardada en la cuenta
   if(f==="fecha"){
     row.fecha=el.value;
     var span=rowsEl.querySelector('.ffin[data-ffin="'+id+'"]'); if(span) span.textContent=el.value;
@@ -2571,6 +2572,7 @@ rowsEl.addEventListener("change", function(e){
   if(el.id==="orderSelect"){ currentId=(el.value===""?null:parseInt(el.value,10)); previewOpen=false; renderRows(); return; }
   var id=el.getAttribute("data-id");
   var row=id?byId(id):null; if(!row) return;
+  row._tocado=true;
   if(el.getAttribute("data-opt")==="1"){ row.optIndex=parseInt(el.value,10); recompAuto(row); renderRows(); return; }
   var vf=el.getAttribute("data-valfld");
   if(vf){ row[vf]=el.value; recompAuto(row); renderRows(); return; }
@@ -3040,7 +3042,7 @@ function renderRepTecnicos(){
 function repSetTecnicoAll(name){
   if(!name) return;
   REP_BATCH_EDITADO=true;
-  REP_BATCH.forEach(function(st){ st.h.by=name; });
+  REP_BATCH.forEach(function(st){ st.h.by=name; st._tocado=true; });
   if(repState){ repState.h.by=name; }
   repRenderForm();
 }
@@ -3155,7 +3157,7 @@ function repSearch(){
   var msg=document.getElementById("repMsg");
   if(!tag){ msg.innerHTML="Escribe un TAG."; return; }
   var rec=repLookup(tag);
-  if(!rec){ msg.innerHTML='<b>TAG no encontrado</b> en la base de calibración: <code>'+esc(tag)+'</code>. Verifica el TAG o adjunta un <code>datos_calibracion.json</code> actualizado en la pestaña Notificaciones (tarjeta 02).'; return; }
+  if(!rec){ msg.innerHTML='<b>TAG no encontrado</b> en la base de calibración: <code>'+esc(tag)+'</code>. Verifica el TAG o adjunta un <code>datos_calibracion.json</code> actualizado en la pestaña Notificaciones (tarjeta 03 · Mapeo, al final).'; return; }
   var idx=repBatchAdd(rec);           // se agrega al lote (o se toma el existente)
   document.getElementById("repTag").value="";
   renderRepSelect();
@@ -3364,8 +3366,8 @@ function repGrabar(){
   var tabs=document.querySelectorAll(".tab");
   tabs.forEach(function(t){ t.addEventListener("click", function(){ switchTab(t.getAttribute("data-tab")); }); });
   var f=document.getElementById("repForm");
-  f.addEventListener("input", function(){ REP_BATCH_EDITADO=true; }, true);
-  f.addEventListener("change", function(){ REP_BATCH_EDITADO=true; }, true);
+  f.addEventListener("input", function(){ REP_BATCH_EDITADO=true; if(repState) repState._tocado=true; }, true);
+  f.addEventListener("change", function(){ REP_BATCH_EDITADO=true; if(repState) repState._tocado=true; }, true);
   f.addEventListener("input", function(e){
     var el=e.target; if(el.tagName!=="INPUT" && el.tagName!=="TEXTAREA") return;
     if(el.hasAttribute("data-h")){ repState.h[el.getAttribute("data-h")]=el.value; return; }
@@ -3410,12 +3412,12 @@ function repGrabar(){
       var cat=testInstrSrc(), ti=cat[code]; if(!ti) return;
       var yaEsta=(repState.std||[]).some(function(p){ return (p[0]||"")===code; });
       if(yaEsta){ alert("Ese patrón ya está en la lista."); return; }
-      repState.std.push([code].concat(ti));   // [code, name, mf, model, serial, lastCal, nextCal]
+      repState.std.push([code].concat(ti)); repState._tocado=true;   // [code, name, mf, model, serial, lastCal, nextCal]
       repRenderStdList(); sel.value="";
       return;
     }
     if(el.getAttribute && el.hasAttribute("data-rmstd")){
-      repState.std.splice(+el.getAttribute("data-rmstd"),1);
+      repState.std.splice(+el.getAttribute("data-rmstd"),1); repState._tocado=true;
       repRenderStdList();
     }
   });
@@ -3670,7 +3672,7 @@ var respaldoNube=(function(){
    Lo que autollena notificaciones y reportes por defecto (TAG_RANGES/TAG_REPORT/TEST_INSTR/TECNICOS, en CAL_OVERRIDE)
    se lee de la base .mdb con el port de src/extract_ranges.ps1 (api.extraer) y se comparte con TODOS los usuarios
    aprobados: un único archivo datos_calibracion.json.gz en el bucket privado respaldo-base. Dos entradas:
-   (1) tras grabar en línea, de la base YA actualizada; (2) botón "Actualizar desde base .mdb" (tarjeta 02).
+   (1) tras grabar en línea, de la base YA actualizada; (2) botón "Actualizar desde base .mdb" (tarjeta 03 · Mapeo).
    Nunca retrocede: si la base es más vieja (menor base.ultimoId = MAX(CalibrationID)) que los datos vigentes, no se
    aplica. Al abrir la app (y al volver la conexión) se bajan los datos de la nube si cambiaron y no son más viejos.
    Sin conexión: se aplican localmente y quedan "pendienteNube" para compartirse después.
@@ -3796,7 +3798,7 @@ var datosCal=(function(){
 
 
 var dbGrabar=(function(){
-  var archivo=null, salida=null, ocupado=false, reloj=null;
+  var archivo=null, salida=null, ocupado=false, reloj=null, baseDescargada=false;
   var prepP=null, tags=[], resumenOk="", fase="", t0=0, hayNube=false;
   function $(id){ return document.getElementById(id); }
   function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
@@ -3923,7 +3925,7 @@ var dbGrabar=(function(){
         estado("No se grabó ninguna calibración: todos los instrumentos se omitieron (sin calibración previa en esa base para usar de plantilla). No hace falta descargar la base y el respaldo de la nube no se tocó.","warn");
         return;
       }
-      salida={ blob:new Blob(out.partes,{type:"application/octet-stream"}), nombre:f.name };
+      salida={ blob:new Blob(out.partes,{type:"application/octet-stream"}), nombre:f.name }; baseDescargada=false;
       $("dbDescargaInfo").textContent=f.name+" · "+mb(salida.blob.size);
       resumenOk="<b>Base actualizada y verificada:</b> "+r.insertados+" calibración(es) grabada(s)"+(r.omitidos?", "+r.omitidos+" omitida(s)":"")+".";
       var datos=out.datos;
@@ -3955,7 +3957,7 @@ var dbGrabar=(function(){
       if(archivo && /backup/i.test(archivo.name)) estado("Esa base parece la <b>_backup</b> (solo consulta). Elige la base <b>editable</b>.","err");
     });
     $("dbProcesar").addEventListener("click", procesar);
-    $("dbDescargar").addEventListener("click", function(){ if(salida && !ocupado) triggerBlob(salida.blob, salida.nombre); });
+    $("dbDescargar").addEventListener("click", function(){ if(salida && !ocupado){ triggerBlob(salida.blob, salida.nombre); baseDescargada=true; } });
     $("dbNubeReintentar").addEventListener("click", function(){ if(salida && !ocupado) respaldar(); });
     $("dbOriginal").addEventListener("click", function(){ if(salida && archivo && !ocupado) triggerBlob(archivo, respaldoNube.nombreOriginal(archivo.name)); });
     $("dbNubeDescargar").addEventListener("click", descargarNube);
@@ -3964,7 +3966,9 @@ var dbGrabar=(function(){
     $("dbModal").addEventListener("click", function(e){ if(e.target===$("dbModal")) cerrar(); });
     document.addEventListener("keydown", function(e){ if(e.key==="Escape" && !$("dbModal").hidden) cerrar(); });
   })();
-  return { abrir:abrir, cerrar:cerrar };
+  return { abrir:abrir, cerrar:cerrar,
+           pendienteSalida:function(){ return { grabando:ocupado, baseSinDescargar:!!(salida && !baseDescargada), nombre:(salida?salida.nombre:"") }; },
+           descargarBase:function(){ if(salida){ triggerBlob(salida.blob, salida.nombre); baseDescargada=true; } } };
 })();
 
 /* ============================================================================
@@ -4144,6 +4148,7 @@ var auth=(function(){
     if(remote) sb.auth.signOut();
     clearCache(); CURRENT_USER=null;
     if(msg){ try{ sessionStorage.setItem("noti_auth_msg",msg); }catch(e){} }
+    if(typeof avisoSalida!=="undefined") avisoSalida.permitirSalida();
     if(typeof location!=="undefined"&&location&&typeof location.reload==="function") location.reload();
   }
   function wire(){
@@ -4176,7 +4181,9 @@ var auth=(function(){
       revalidate().then(function(){ if(CURRENT_USER&&!CURRENT_USER.approved) showMsg("Todavía pendiente de aprobación",true); });
     });
     var pl=$("btnPendLogout"); if(pl) pl.addEventListener("click",function(){ logout(true); });
-    var lo=$("btnLogout"); if(lo) lo.addEventListener("click",function(){ if(confirm("¿Cerrar sesión?")) logout(true); });
+    var lo=$("btnLogout"); if(lo) lo.addEventListener("click",function(){
+      if(typeof avisoSalida!=="undefined" && avisoSalida.hayTrabajo()){ avisoSalida.mostrar(true); return; }   // primero guardar el trabajo
+      if(confirm("¿Cerrar sesión?")) logout(true); });
     if(typeof window!=="undefined"&&window.addEventListener){
       window.addEventListener("storage",function(e){ if(e.key!==AUTH_KEY) return; var c=loadCache(); if(!c){ logout(false); return; } if(c.tokens) sb.setSession(c.tokens); });
       window.addEventListener("online",function(){ setOffline(false); revalidate(); if(typeof misReportes!=="undefined") misReportes.flushPending(); });
@@ -4236,7 +4243,7 @@ var misReportes=(function(){
     return st;
   }
   // ---- serialización de una notificación (la fila completa + el .txt tal cual) ----
-  var PRIV=["_cloudId","_cloudAt","_cloudPending","_cloudError","_qid"];
+  var PRIV=["_cloudId","_cloudAt","_cloudPending","_cloudError","_qid","_cloudSig","_cloudSigQ","_tocado"];
   function stripPriv(o){ var c=JSON.parse(JSON.stringify(o)); PRIV.forEach(function(k){ delete c[k]; }); return c; }
   function serializeNoti(row){ return { v:1, row:stripPriv(row), txt:genText(row), filename:fileNameOf(row) }; }
   function deserializeNoti(p){ var r=JSON.parse(JSON.stringify(p.row)); r.id=++uid; r.saved=true; recompAuto(r); return r; }
@@ -4249,7 +4256,7 @@ var misReportes=(function(){
     q.forEach(function(x,i){ if(x.qid===qid) ex=i; });
     var rec={qid:qid,user_id:(CURRENT_USER?CURRENT_USER.id:null),kind:item.kind,tag:item.tag,ot:item.ot,titulo:item.titulo,payload:item.payload,cloud_id:obj._cloudId||null,queued_at:new Date().toISOString(),tries:(ex>=0?(q[ex].tries||0):0),lastError:""};
     if(ex>=0) q[ex]=rec; else q.push(rec);
-    obj._qid=qid; obj._cloudPending=true; obj._cloudError=""; saveQ(q);
+    obj._qid=qid; obj._cloudPending=true; obj._cloudError=""; obj._cloudSigQ=JSON.stringify(item.payload); saveQ(q);
   }
   function dequeue(qid){ if(!qid) return; saveQ(loadQ().filter(function(x){ return x.qid!==qid; })); }
   function push(item,cloudId){
@@ -4260,7 +4267,7 @@ var misReportes=(function(){
   function guardar(item,obj){
     if(!auth.canSave()){ var e0=new Error("Tu cuenta está pendiente de aprobación; todavía no puedes guardar en tu cuenta"); e0.status=403; return Promise.reject(e0); }
     return push(item,obj._cloudId).then(function(r){
-      var x=r&&r[0]; if(x){ obj._cloudId=x.id; obj._cloudAt=x.updated_at||new Date().toISOString(); }
+      var x=r&&r[0]; if(x){ obj._cloudId=x.id; obj._cloudAt=x.updated_at||new Date().toISOString(); obj._cloudSig=JSON.stringify(item.payload); obj._cloudSigQ=null; }
       obj._cloudPending=false; obj._cloudError=""; if(obj._qid){ dequeue(obj._qid); obj._qid=null; }
       return x;
     }, function(e){
@@ -4294,6 +4301,32 @@ var misReportes=(function(){
     }
     return next();
   }
+  // ---- trabajo sin guardar (aviso al cerrar) ----
+  function estadoGuardado(obj, payload){
+    var sig=JSON.stringify(payload);
+    if(obj._cloudId && obj._cloudSig===sig) return "guardado";
+    if(obj._cloudSigQ===sig) return "cola";
+    return "sin";
+  }
+  function sinGuardar(){
+    var notis=[], cals=[];
+    (rows||[]).forEach(function(r){ if(r && r._tocado && estadoGuardado(r, serializeNoti(r))==="sin") notis.push(r); });
+    (REP_BATCH||[]).forEach(function(st){ if(st && st._tocado && estadoGuardado(st, serializeCal(st))==="sin") cals.push(st); });
+    return { notis:notis, cals:cals };
+  }
+  /* Guarda en la cuenta, sin alertas, las notificaciones y reportes dados. Resuelve {ok, pend, err}. */
+  function guardarLista(notis, cals){
+    var items=[], ok=0, pend=0, err=[], i=0;
+    (notis||[]).forEach(function(r){ items.push({ obj:r, nombre:(r.ot||r.tag||"?"), item:function(){ r.saved=true; return itemNoti(r); } }); });
+    (cals||[]).forEach(function(st){ items.push({ obj:st, nombre:st.rec.tag, item:function(){ return itemCal(st); } }); });
+    function next(){
+      if(i>=items.length){ try{ renderRows(); }catch(e){} renderRepStatus(); updatePendBadge(loadQ()); return Promise.resolve({ ok:ok, pend:pend, err:err }); }
+      var it=items[i++];
+      return guardar(it.item(), it.obj).then(function(){ ok++; return next(); },
+        function(e){ if(e.offline||(e.status&&e.status>=500)) pend++; else err.push(it.nombre+": "+e.message); return next(); });
+    }
+    return next();
+  }
   // ---- cola: reintentar lo pendiente ----
   var _flushing=false;
   function flushPending(){
@@ -4306,7 +4339,7 @@ var misReportes=(function(){
       var it=q[i++], item={kind:it.kind,tag:it.tag,ot:it.ot,titulo:it.titulo,payload:it.payload};
       return push(item,it.cloud_id).then(function(r){
         var x=r&&r[0]; dequeue(it.qid);
-        var obj=findObj(it.qid); if(obj){ obj._qid=null; obj._cloudPending=false; obj._cloudError=""; if(x){ obj._cloudId=x.id; obj._cloudAt=x.updated_at; } }
+        var obj=findObj(it.qid); if(obj){ obj._qid=null; obj._cloudPending=false; obj._cloudError=""; if(x){ obj._cloudId=x.id; obj._cloudAt=x.updated_at; obj._cloudSig=JSON.stringify(it.payload); obj._cloudSigQ=null; } }
         return next();
       }, function(e){
         var all=loadQ(); all.forEach(function(x){ if(x.qid===it.qid){ x.tries=(x.tries||0)+1; x.lastError=e.message||""; } }); saveQ(all);
@@ -4351,12 +4384,12 @@ var misReportes=(function(){
   function abrir(id){
     return fetchOne(id).then(function(x){
       if(x.kind==="calibracion"){
-        var st=deserializeCal(x.payload); st._cloudId=x.id; st._cloudAt=x.updated_at;
+        var st=deserializeCal(x.payload); st._cloudId=x.id; st._cloudAt=x.updated_at; st._cloudSig=JSON.stringify(serializeCal(st));
         var k=normTag(st.rec.tag), had=REP_BATCH.some(function(s){ return normTag(s.rec.tag)===k; });
         if(had && !confirm("Ya hay un reporte de "+st.rec.tag+" cargado. ¿Reemplazarlo por el guardado en tu cuenta?")) return;
         var idx=repBatchPut(st); renderRepSelect(); var sel=$("repSelect"); if(sel) sel.value=String(idx); repSelectShow(idx); switchTab("reporte");
       } else {
-        var r=deserializeNoti(x.payload); r._cloudId=x.id; r._cloudAt=x.updated_at;
+        var r=deserializeNoti(x.payload); r._cloudId=x.id; r._cloudAt=x.updated_at; r._cloudSig=JSON.stringify(serializeNoti(r));
         var kk=normTag(r.tag||""), i=-1; rows.forEach(function(rr,ii){ if(String(rr.ot||"")===String(r.ot||"") && normTag(rr.tag||"")===kk) i=ii; });
         if(i>=0){ if(!confirm("Ya hay una orden "+(r.ot||"")+" ("+(r.tag||"")+") cargada. ¿Reemplazarla por la guardada en tu cuenta?")) return; rows[i]=r; } else rows.push(r);
         currentId=r.id; renderRows(); switchTab("noti");
@@ -4410,7 +4443,8 @@ var misReportes=(function(){
   return { serializeCal:serializeCal, deserializeCal:deserializeCal, serializeNoti:serializeNoti, deserializeNoti:deserializeNoti,
            itemCal:itemCal, itemNoti:itemNoti, guardar:guardar, guardarCal:guardarCal, guardarCalTodos:guardarCalTodos, guardarNoti:guardarNoti, guardarNotiTodas:guardarNotiTodas,
            flushPending:flushPending, listar:listar, abrir:abrir, eliminar:eliminar, renderRepStatus:renderRepStatus, renderPend:renderPend,
-           updatePendBadge:function(){ updatePendBadge(loadQ()); }, pendientes:function(){ return myQ(); } };
+           updatePendBadge:function(){ updatePendBadge(loadQ()); }, pendientes:function(){ return myQ(); },
+           sinGuardar:sinGuardar, guardarLista:guardarLista };
 })();
 
 /* ---------- adminUsers: aprobar / revocar / rol (solo administradores) ---------- */
@@ -4458,6 +4492,97 @@ var adminUsers=(function(){
 loadMap();
 renderMap();
 renderCalStatus();
+/* ============================================================================
+   AVISO AL CERRAR LA PÁGINA (avisoSalida)
+   Los navegadores NO dejan mostrar una ventana propia en el momento de cerrar: si hay trabajo sin guardar se pide el
+   aviso estándar del navegador ("¿Salir del sitio?") y, si el usuario elige quedarse, se abre #salidaModal con
+   "Guardar todo en mi cuenta" (el setTimeout programado en beforeunload solo corre si la página no se cerró).
+   Trabajo sin guardar = notificaciones o reportes EDITADOS (_tocado) cuyo contenido no coincide con lo guardado en la
+   cuenta (_cloudSig) ni con lo que ya está en cola (_cloudSigQ), una base grabada en línea sin descargar o un grabado
+   en curso. Al intentar salir, la sesión local se guarda de inmediato. "Cerrar sesión" con trabajo sin guardar abre
+   la misma ventana; los cierres/recargas propios de la app (logout) llaman permitirSalida() y no avisan.
+   ============================================================================ */
+var avisoSalida=(function(){
+  var permitir=false, conLogout=false, guardando=false;
+  function $(id){ return document.getElementById(id); }
+  function trabajo(){
+    var t={notis:[], cals:[], pendientes:0, grabando:false, baseSinDescargar:false, nombreBase:""};
+    try{
+      if(_appBooted && CURRENT_USER){
+        var s=misReportes.sinGuardar(); t.notis=s.notis; t.cals=s.cals;
+        t.pendientes=misReportes.pendientes().length;
+      }
+    }catch(e){}
+    try{ var g=dbGrabar.pendienteSalida(); t.grabando=g.grabando; t.baseSinDescargar=g.baseSinDescargar; t.nombreBase=g.nombre; }catch(e){}
+    t.hay=!!(t.notis.length || t.cals.length || t.grabando || t.baseSinDescargar);
+    return t;
+  }
+  function plural(n, s, p){ return n+" "+(n===1?s:p); }
+  function estado(html, cls){ var el=$("salidaEstado"); if(!el) return; el.className="dbst"+(cls?" "+cls:""); el.innerHTML=html||""; }
+  function render(){
+    var t=trabajo(), li=[];
+    if(t.notis.length) li.push("<li><b>"+plural(t.notis.length,"notificación editada","notificaciones editadas")+"</b> sin guardar en tu cuenta: "+
+      esc(t.notis.map(function(r){ return (r.ot?r.ot+" · ":"")+(r.tag||sinTipoOrden(r.denom||"")); }).join(", "))+".</li>");
+    if(t.cals.length) li.push("<li><b>"+plural(t.cals.length,"reporte de calibración editado","reportes de calibración editados")+"</b> sin guardar en tu cuenta: "+
+      esc(t.cals.map(function(s){ return s.rec.tag; }).join(", "))+".</li>");
+    if(t.baseSinDescargar) li.push("<li><b>Base de datos actualizada sin descargar</b> ("+esc(t.nombreBase)+"). Si cierras, tendrás que volver a grabarla.</li>");
+    if(t.grabando) li.push("<li><b>Se está grabando la base de datos.</b> Espera a que termine antes de cerrar.</li>");
+    if(t.pendientes) li.push("<li>"+plural(t.pendientes,"elemento pendiente","elementos pendientes")+" de subir por falta de conexión: se suben solos la próxima vez que abras la app en este navegador.</li>");
+    if(!t.hay) li.push("<li>No queda trabajo sin guardar. Ya puedes cerrar la página.</li>");
+    $("salidaLista").innerHTML=li.join("");
+    $("salidaGuardar").disabled = guardando || !(t.notis.length || t.cals.length);
+    $("salidaBase").hidden = !t.baseSinDescargar;
+    $("salidaLogout").hidden = !conLogout;
+    $("salidaSeguir").disabled = guardando;
+    $("salidaLogout").disabled = guardando;
+    return t;
+  }
+  function mostrar(logout){
+    conLogout=!!logout;
+    estado("");
+    render();
+    $("salidaModal").hidden=false; document.body.classList.add("modal-open");
+  }
+  function cerrar(){
+    if(guardando) return;
+    $("salidaModal").hidden=true;
+    if($("dbModal").hidden) document.body.classList.remove("modal-open");
+  }
+  function guardarTodo(){
+    var t=trabajo();
+    if(guardando || !(t.notis.length || t.cals.length)) return;
+    guardando=true; render(); estado("Guardando en tu cuenta…");
+    misReportes.guardarLista(t.notis, t.cals).then(function(r){
+      guardando=false;
+      var t2=render();
+      if(r.err.length) estado("<b>No se pudo guardar todo:</b> "+esc(r.err.join("; ")), "err");
+      else if(r.pend) estado("<b>Sin conexión:</b> "+plural(r.pend,"quedó pendiente","quedaron pendientes")+" de subir en este navegador (se suben solos al volver la conexión)."+(r.ok?" "+r.ok+" ya se guardaron.":""), "warn");
+      else estado("<b>Guardado en tu cuenta</b> ("+plural(r.ok,"elemento","elementos")+"). "+(t2.hay?"Revisa lo que queda en la lista.":"Ya puedes cerrar la página."), "ok");
+    });
+  }
+  window.addEventListener("beforeunload", function(e){
+    if(permitir) return;
+    try{ if(_appBooted && CURRENT_USER) saveSession(); }catch(_){}
+    var t;
+    try{ t=trabajo(); }catch(_){ return; }
+    if(!t.hay) return;
+    e.preventDefault();
+    e.returnValue="";
+    setTimeout(function(){ mostrar(false); }, 0);   // solo corre si el usuario eligió quedarse
+    return "";
+  });
+  (function wire(){
+    var g=$("salidaGuardar"); if(!g) return;
+    g.addEventListener("click", guardarTodo);
+    $("salidaBase").addEventListener("click", function(){ dbGrabar.descargarBase(); render(); });
+    $("salidaSeguir").addEventListener("click", cerrar);
+    $("salidaLogout").addEventListener("click", function(){ if(guardando) return; permitir=true; auth.logout(true); });
+    $("salidaModal").addEventListener("click", function(e){ if(e.target===$("salidaModal")) cerrar(); });
+    document.addEventListener("keydown", function(e){ if(e.key==="Escape" && !$("salidaModal").hidden) cerrar(); });
+  })();
+  return { mostrar:mostrar, trabajo:trabajo, hayTrabajo:function(){ return trabajo().hay; }, permitirSalida:function(){ permitir=true; } };
+})();
+
 var _appBooted=false;
 function bootApp(){                            // UNA vez, tras autenticar y estar aprobado (auth.init -> unlock)
   if(_appBooted) return; _appBooted=true;

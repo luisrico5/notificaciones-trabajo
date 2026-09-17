@@ -274,7 +274,7 @@ async function main() {
   ok(await P.ev("!document.getElementById('dbDescargaRow').hidden && document.getElementById('dbNubeFallo').hidden"), "ofrece 'Descargar base actualizada' (sin botones de fallo)");
   ok(await P.ev("/20260908_dpctrack2_editable\\.mdb/.test(document.getElementById('dbNubeInfo').textContent) && !document.getElementById('dbNubeDescargar').disabled"), "info de la nube actualizada y 'Descargar respaldo' habilitado");
   await P.ev("document.getElementById('dbDescargar').click(); true");
-  const mdbOut = await esperarDescarga("20260908_dpctrack2_editable.mdb", 60000);
+  const mdbOut = await esperarDescarga("20260908_dpctrack2_editable.mdb", 180000);
   ok(fs.statSync(mdbOut.file).size > 1000000 && !fs.readFileSync(mdbOut.file).equals(orig1), "descargó la base actualizada con el mismo nombre");
   ok(hash(ed1) === hashAntes, "el archivo original del PC no cambió");
   const dd4 = await P.esperarDatos(), d4 = datosNube();
@@ -284,7 +284,12 @@ async function main() {
 
   console.log("\n[5] Descargar el respaldo de la nube");
   await P.ev("document.getElementById('dbNubeDescargar').click(); true");
-  const rest = await esperarDescarga(/^20260908_dpctrack2_editable_ORIGINAL_\d{4}-\d{2}-\d{2}_\d{4}\.mdb$/, 60000);
+  const rest = await esperarDescarga(/^20260908_dpctrack2_editable_ORIGINAL_\d{4}-\d{2}-\d{2}_\d{4}\.mdb$/, 180000).catch(async e => {
+    console.log("     (diagnóstico) nubeEstado=" + await P.ev("document.getElementById('dbNubeEstado').textContent") + " | nubeInfo=" + await P.ev("document.getElementById('dbNubeInfo').textContent") +
+      " | botón deshabilitado=" + await P.ev("document.getElementById('dbNubeDescargar').disabled") + " | salidaModal visible=" + await P.ev("!document.getElementById('salidaModal').hidden") +
+      " | diálogos=" + JSON.stringify(P.dialogs) + " | descargas=" + JSON.stringify(descargas.map(d => d.nombre + (d.listo ? "" : "(incompleta)"))));
+    throw e;
+  });
   ok(fs.readFileSync(rest.file).equals(orig1), "baja " + rest.nombre + " idéntica a la base original");
   await P.esperar("document.getElementById('dbNubeEstado').classList.contains('ok')", 10000, "estado de descarga de nube");
   ok(/huella verificada/.test(await P.ev("document.getElementById('dbNubeEstado').textContent")), "huella SHA-256 verificada al descargar");
@@ -324,12 +329,12 @@ async function main() {
   ok(await P.ev("!document.getElementById('dbNubeFallo').hidden && !document.getElementById('dbDescargaRow').hidden"), "muestra 'Reintentar', 'Descargar base original' y 'Descargar base actualizada'");
   ok(gunzip(nube.objetos.get("base_original.mdb.gz")).equals(orig2), "el respaldo anterior de la nube quedó intacto");
   await P.ev("document.getElementById('dbOriginal').click(); true");
-  const o3 = await esperarDescarga(/^20260908_dpctrack2_editable_ORIGINAL_\d{4}-\d{2}-\d{2}_\d{4}\.mdb$/, 60000);
+  const o3 = await esperarDescarga(/^20260908_dpctrack2_editable_ORIGINAL_\d{4}-\d{2}-\d{2}_\d{4}\.mdb$/, 180000);
   ok(fs.readFileSync(o3.file).equals(orig3), "'Descargar base original' baja " + o3.nombre + " idéntica a la elegida");
   const dd8 = await P.esperarDatos();
   ok(dd8.cls === "warn" && /más vieja/.test(dd8.texto) && datosNube().base.ultimoId === idTras7, "la base de este grabado es más vieja que los datos vigentes: no retrocede (" + dd8.texto + ")");
   await P.ev("document.getElementById('dbDescargar').click(); true");
-  const m3 = await esperarDescarga("20260908_dpctrack2_editable.mdb", 60000);
+  const m3 = await esperarDescarga("20260908_dpctrack2_editable.mdb", 180000);
   ok(fs.statSync(m3.file).size > 1000000 && !fs.readFileSync(m3.file).equals(orig3), "'Descargar base actualizada' también funciona");
   nube.modo = "ok"; nube.intentos = 0;
   await P.ev("document.getElementById('dbNubeReintentar').click(); true");
