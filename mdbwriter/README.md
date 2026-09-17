@@ -72,7 +72,10 @@ Siempre sobre **copias** de la base editable, nunca la `_backup`. La clave va po
 - `test/e2e_navegador.js <index.html | URL publicada> <copia.mdb> <carpeta>`: Chrome real (headless): abre el
   diálogo, rechaza la `_backup`, graba con Web Worker, descarga la base y el JSON, comprueba que el original no cambió,
   que el resto de la pestaña sigue funcionando y (con ruta local) que también funciona abriendo `index.html` como
-  archivo. Con la URL de GitHub Pages prueba la página publicada.
+  archivo. Con la URL de GitHub Pages prueba la página publicada. **Simula Supabase** (respaldo de la base original):
+  un script inyectado desvía las llamadas a Storage y a `respaldo_base` a un servidor local en memoria y comprueba
+  respaldo idéntico tras gunzip, uno solo en el bucket, reemplazo, nube caída (3 intentos + descargas de original y
+  actualizada + reintento), 403 sin reintentos y descarga del respaldo con huella verificada.
 
 Resultados al incorporarlo (base del 2026-09-08): JSON reales del 18-ago (15 instrumentos) y del 08-sep
 (9 instrumentos, 1 omitido), casos borde y el lote del navegador → **idénticos** a `grabar_reporte.ps1`/`grabar.bat`;

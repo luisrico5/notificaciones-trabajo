@@ -435,8 +435,10 @@ de DPCTrack de referencia (`PT-U7122.pdf`).
 Para **grabar en línea** (Opción 1), siempre sobre COPIAS de la base editable y con la clave en `DPC_CLAVE`:
 `mdbwriter/test/run_case.sh` (grabar_reporte.ps1 vs port: volcado de 8 tablas + conteos idénticos; JS = JVM byte a
 byte; índices con DAO), `mdbwriter/test/e2e_navegador.js` (Chrome real headless por DevTools: diálogo, rechazo de
-_backup, archivo dañado, Web Worker, descarga de base y JSON, original intacto, file://; **simula Supabase** con
-`Fetch.requestPaused`: respaldo idéntico a la original tras gunzip, uno solo en el bucket, reemplazo en el 2.º
+_backup, archivo dañado, Web Worker, descarga de base y JSON, original intacto, file://; **simula Supabase** con un
+script inyectado (`Page.addScriptToEvaluateOnNewDocument`) que desvía `fetch` de Storage/`respaldo_base` a un
+servidor local — NO usar `Fetch.requestPaused`: Chrome corta DevTools al pausar un POST de ~6 MB —: respaldo
+idéntico a la original tras gunzip, uno solo en el bucket, reemplazo en el 2.º
 grabado, nube caída → 3 intentos + descargas original/actualizada + reintento, 403 sin reintentos, descarga del
 respaldo con huella) y, sobre la base descargada,
 `verify_index.ps1` + compactado DAO. Tras la prueba del navegador se graba con `grabar.bat` el JSON descargado y
