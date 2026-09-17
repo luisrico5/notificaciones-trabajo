@@ -399,7 +399,7 @@
     <p id="dbResumen" class="hint" style="margin-top:0"></p>
 
     <h3>Opción 1 · Actualizar la base aquí mismo</h3>
-    <p class="hint" style="margin-top:0">Elige la base <b>editable</b> de DPCTrack2 (.mdb) que tengas en este PC. Se actualiza <b>dentro del navegador</b> con las mismas reglas que <b>grabar.bat</b> (calibración + especificación + contador de IDs), se verifica, y al final la <b>descargas</b> para llevarla a DPCTrack. La base no se envía a ningún servidor y el archivo original de tu PC no se modifica.</p>
+    <p class="hint" style="margin-top:0">Elige la base <b>editable</b> de DPCTrack2 (.mdb) que tengas en este PC. Se actualiza <b>dentro del navegador</b> con las mismas reglas que <b>grabar.bat</b> (calibración + especificación + contador de IDs), se verifica, y al final la <b>descargas</b> para llevarla a DPCTrack. Antes de entregártela, la página guarda la base <b>original</b> (comprimida) como <b>respaldo en la nube</b> privada de la app: siempre hay <b>un solo respaldo</b>, el de la última base que actualizaste. El archivo de tu PC no se modifica.</p>
     <div class="dbrow">
       <label class="btn filelbl">Elegir base .mdb<input type="file" id="dbFile" accept=".mdb" hidden></label>
       <span id="dbFileName" class="cloudst dbfile">Ninguna base elegida</span>
@@ -413,16 +413,30 @@
       <button id="dbDescargar" class="btn primary">Descargar base actualizada</button>
       <span id="dbDescargaInfo" class="cloudst dbfile"></span>
     </div>
+    <div id="dbNubeFallo" class="dbrow" hidden>
+      <button id="dbNubeReintentar" class="btn">Reintentar respaldo</button>
+      <button id="dbOriginal" class="btn">Descargar base original</button>
+    </div>
 
     <h3>Opción 2 · Descargar el JSON (para grabar.bat)</h3>
     <p class="hint" style="margin-top:0">El flujo de siempre: descarga el JSON con todos los instrumentos y arrástralo sobre <b>grabar.bat</b> junto con la base editable.</p>
     <div class="dbrow">
       <button id="dbJson" class="btn">Descargar JSON</button>
     </div>
+
+    <h3>Respaldo en la nube</h3>
+    <p class="hint" style="margin-top:0">Es la base <b>original</b> tal como estaba antes del último grabado en línea (solo existe uno). Descárgala si necesitas volver atrás: baja con <b>_ORIGINAL_</b> y la fecha en el nombre; quítalo al renombrarla antes de llevarla a DPCTrack.</p>
+    <div class="dbrow">
+      <span id="dbNubeInfo" class="cloudst dbfile">Aún no consultado.</span>
+    </div>
+    <div class="dbrow">
+      <button id="dbNubeDescargar" class="btn" disabled>Descargar respaldo de la nube</button>
+    </div>
+    <div id="dbNubeEstado" class="dbst" aria-live="polite"></div>
   </section>
 </div>
 
-<footer>Funciona en tu navegador · Los reportes se guardan en tu cuenta (Supabase) · Sin conexión puedes generar .txt/PDF; guardar requiere internet · <span title="Fecha de compilación. Si no coincide con la última, recarga con Ctrl+Shift+R.">versión 2026-09-16 21:33</span></footer>
+<footer>Funciona en tu navegador · Los reportes se guardan en tu cuenta (Supabase) · Sin conexión puedes generar .txt/PDF; guardar requiere internet · <span title="Fecha de compilación. Si no coincide con la última, recarga con Ctrl+Shift+R.">versión 2026-09-16 22:59</span></footer>
 </div>
 <div id="reportPrint" aria-hidden="true"></div>
 <div id="authGate">
@@ -6765,9 +6779,10 @@ function repGrabar(){
    GRABAR EN LÍNEA LA BASE DPCTrack2 (.mdb) — diálogo del botón "Grabar a la base de datos"
    - Opción 1: el usuario elige la base editable de SU PC; se graba en memoria dentro del navegador con
      MDBW_FACTORY (src/grabar_mdb.js = port de src/grabar_reporte.ps1 compilado a JavaScript; ver mdbwriter/),
-     se autoverifica y se ofrece descargar con el mismo nombre. Nada sale del navegador y el archivo original
-     no se toca. Corre en un Web Worker (la página no se congela); si el navegador no deja crear el worker,
-     corre en el hilo principal.
+     se autoverifica y, ANTES de ofrecer la descarga, se guarda la base ORIGINAL comprimida como respaldo único en
+     la nube (respaldoNube; con reintentos; si no sube, se dejan descargar la original y la actualizada). El
+     archivo del PC no se toca. Corre en un Web Worker (la página no se congela); si el navegador no deja crear
+     el worker, corre en el hilo principal.
    - Opción 2: repGrabar() de siempre (descarga el JSON para grabar.bat), sin cambios.
    ============================================================================ */
 /* Cuerpo del Web Worker (se serializa con toString; no usa nada de fuera salvo MDBW_FACTORY). */
@@ -6806,12 +6821,128 @@ function mdbwEjecutar(api, buffer, json, ahora, nombre){
   api.liberar();
   return { res:res, partes:partes };
 }
+/* Respaldo en la nube de la base ORIGINAL (antes de grabar), en Supabase Storage (bucket PRIVADO 'respaldo-base').
+   Siempre existe UNO solo: ruta fija base_original.mdb.gz (cada subida lo reemplaza con x-upsert; el anterior solo
+   desaparece cuando el nuevo subió completo) + tabla de UNA fila public.respaldo_base con nombre, tamaños, sha256,
+   instrumentos, quién y cuándo (lo fija un trigger). Solo usuarios aprobados (RLS). Ver supabase/schema.sql. */
+var respaldoNube=(function(){
+  var BUCKET="respaldo-base", RUTA="base_original.mdb.gz", ESPERAS=[3000,7000];   // 3 intentos: a los 0, 3 y 10 s
+  function z2(n){ return (n<10?"0":"")+n; }
+  function hex(buf){ var a=new Uint8Array(buf), s="", i; for(i=0;i<a.length;i++){ s+=(a[i]<16?"0":"")+a[i].toString(16); } return s; }
+  /* SHA-256 en hex; "" si el navegador no tiene WebCrypto. digest copia los bytes al llamarlo, así que después se
+     puede transferir el buffer al worker. */
+  function sha256(buf){
+    try{
+      if(typeof crypto==="undefined"||!crypto.subtle||!crypto.subtle.digest) return Promise.resolve("");
+      return crypto.subtle.digest("SHA-256", buf).then(hex, function(){ return ""; });
+    }catch(e){ return Promise.resolve(""); }
+  }
+  function comprimir(blob){
+    if(typeof CompressionStream==="undefined"||typeof Response==="undefined"||!blob.stream)
+      return Promise.reject(new Error("Este navegador no puede comprimir el respaldo (usa Chrome o Edge actualizados)"));
+    return new Response(blob.stream().pipeThrough(new CompressionStream("gzip"))).blob();
+  }
+  function descomprimir(blob){
+    if(typeof DecompressionStream==="undefined"||typeof Response==="undefined"||!blob.stream)
+      return Promise.reject(new Error("Este navegador no puede descomprimir el respaldo (usa Chrome o Edge actualizados)"));
+    return new Response(blob.stream().pipeThrough(new DecompressionStream("gzip"))).blob();
+  }
+  /* Nombre con que se descarga la base original: <base>_ORIGINAL_<aaaa-mm-dd_hhmm>.mdb */
+  function nombreOriginal(nombre, fecha){
+    var d=fecha?new Date(fecha):new Date(); if(isNaN(d.getTime())) d=new Date();
+    return String(nombre||"base.mdb").replace(/\.mdb$/i,"")+"_ORIGINAL_"+d.getFullYear()+"-"+z2(d.getMonth()+1)+"-"+z2(d.getDate())+"_"+z2(d.getHours())+z2(d.getMinutes())+".mdb";
+  }
+  function fechaHora(iso){ var d=new Date(iso); if(isNaN(d.getTime())) return ""; return z2(d.getDate())+"/"+z2(d.getMonth()+1)+"/"+d.getFullYear()+" "+z2(d.getHours())+":"+z2(d.getMinutes()); }
+  /* Storage a veces responde HTTP 400 con {statusCode:"403"|"404"|"413"} en el cuerpo. */
+  function codigo(e){ var sc=e&&e.raw&&e.raw.statusCode; sc=sc?parseInt(sc,10):0; return sc||(e&&e.status)||0; }
+  function reintentable(e){
+    if(!e) return false;
+    if(e.offline) return true;
+    var st=(e.status||0);
+    return st>=500 || st===429;
+  }
+  function mensaje(e){
+    if(!e) return "Error desconocido";
+    if(e.name==="NotReadableError") return "La base cambió en el disco desde que la elegiste (¿DPCTrack la tiene abierta?)";
+    if(e.offline) return "Sin conexión con el servidor";
+    var sc=codigo(e), m=String((e.raw&&(e.raw.message||e.raw.msg))||e.message||"");
+    if(/bucket not found/i.test(m) || /PGRST205|42P01/i.test(String(e.code||"")) || (e.status===404 && /respaldo_base/i.test(m)))
+      return "Falta configurar el respaldo en Supabase (ejecuta la sección de respaldo de supabase/schema.sql)";
+    if(sc===403 || /row-level security|unauthorized/i.test(m)) return "Tu cuenta no tiene permiso para el respaldo (¿pendiente de aprobación?)";
+    if(sc===413 || /maximum allowed size|too large/i.test(m)) return "El respaldo supera el tamaño permitido en la nube";
+    if((e.status||0)>=500) return "El servidor no responde (¿proyecto de Supabase pausado?)";
+    return e.message||m||"Error";
+  }
+  /* Prepara el respaldo: huella (de buf si se da; si no, leyendo el archivo) + gzip del archivo original. */
+  function preparar(file, buf, instrumentos){
+    var shaP = buf ? sha256(buf) : ((file.arrayBuffer?file.arrayBuffer():Promise.reject(new Error("No se pudo leer la base"))).then(sha256));
+    return Promise.all([shaP, comprimir(file)]).then(function(r){
+      return { sha256:r[0], gz:r[1], nombre:file.name, bytes:file.size, instrumentos:instrumentos||[] };
+    });
+  }
+  function limpiarOtros(){
+    return sb.req("/storage/v1/object/list/"+BUCKET,{method:"POST",body:{prefix:"",limit:100,offset:0}}).then(function(list){
+      var otros=(list||[]).map(function(o){ return o&&o.name; }).filter(function(n){ return n && n!==RUTA; });
+      if(!otros.length) return null;
+      return sb.req("/storage/v1/object/"+BUCKET,{method:"DELETE",body:{prefixes:otros}});
+    });
+  }
+  /* Sube (reemplaza) el objeto, actualiza la fila y borra cualquier otro objeto del bucket. Devuelve la fila. */
+  function subir(prep){
+    return sb.req("/storage/v1/object/"+BUCKET+"/"+RUTA,{method:"POST",raw:prep.gz,contentType:"application/gzip",headers:{"x-upsert":"true","cache-control":"no-cache"}})
+      .then(function(){
+        return sb.from("respaldo_base").upsert({id:1,nombre:prep.nombre,bytes:prep.bytes,bytes_gz:prep.gz.size,sha256:prep.sha256,instrumentos:prep.instrumentos},"id");
+      })
+      .then(function(rows){
+        var fila=(rows&&rows[0])||{nombre:prep.nombre,bytes:prep.bytes,bytes_gz:prep.gz.size,sha256:prep.sha256};
+        return limpiarOtros().then(function(){ return fila; }, function(){ return fila; });
+      });
+  }
+  function subirConReintentos(prepP, onIntento){
+    return prepP.then(function(prep){
+      var intento=0, total=1+ESPERAS.length;
+      function uno(){
+        intento++; if(onIntento) onIntento(intento,total);
+        return subir(prep).then(null,function(e){
+          if(intento<total && reintentable(e)) return new Promise(function(r){ setTimeout(r, ESPERAS[intento-1]); }).then(uno);
+          throw e;
+        });
+      }
+      return uno();
+    });
+  }
+  function info(){
+    return sb.from("respaldo_base").select("nombre,bytes,bytes_gz,sha256,instrumentos,subido_por_nombre,subido_at",{id:"eq.1"})
+      .then(function(rows){ return (rows&&rows[0])||null; });
+  }
+  /* Descarga y descomprime el respaldo; comprueba la huella contra la fila. */
+  function descargar(){
+    return info().then(function(fila){
+      if(!fila) throw new Error("Aún no hay respaldo en la nube");
+      return sb.req("/storage/v1/object/authenticated/"+BUCKET+"/"+RUTA+"?t="+Date.now(),{as:"blob"})
+        .then(descomprimir)
+        .then(function(blob){
+          return blob.arrayBuffer().then(sha256).then(function(h){
+            return { blob:blob, nombre:nombreOriginal(fila.nombre, fila.subido_at), fila:fila, shaOk:(!fila.sha256 || !h || h===fila.sha256) };
+          });
+        });
+    });
+  }
+  return { sha256:sha256, preparar:preparar, subirConReintentos:subirConReintentos, info:info, descargar:descargar,
+           nombreOriginal:nombreOriginal, fechaHora:fechaHora, mensaje:mensaje, BUCKET:BUCKET, RUTA:RUTA };
+})();
+
 var dbGrabar=(function(){
   var archivo=null, salida=null, ocupado=false, reloj=null, apiLocal=null;
+  var prepP=null, tags=[], resumenOk="", fase="", t0=0, hayNube=false;
   function $(id){ return document.getElementById(id); }
   function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
   function mb(b){ return (b/1048576).toFixed(1).replace(".",",")+" MB"; }
   function estado(html, cls){ var el=$("dbEstado"); el.className="dbst"+(cls?" "+cls:""); el.innerHTML=html||""; }
+  function estadoNube(html, cls){ var el=$("dbNubeEstado"); el.className="dbst"+(cls?" "+cls:""); el.innerHTML=html||""; }
+  function tick(){ estado(fase+" <span class=\"cloudst\">("+Math.round((Date.now()-t0)/1000)+" s)</span>"); }
+  function iniciarReloj(){ if(!t0) t0=Date.now(); tick(); if(!reloj) reloj=setInterval(tick, 1000); }
+  function terminar(){ clearInterval(reloj); reloj=null; ocupado=false; refrescar(); }
   function ahoraIso(){
     var d=new Date(), z=function(x,k){ x=String(x); while(x.length<(k||2)) x="0"+x; return x; };
     return d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate())+"T"+z(d.getHours())+":"+z(d.getMinutes())+":"+z(d.getSeconds())+"."+z(d.getMilliseconds(),3);
@@ -6821,10 +6952,27 @@ var dbGrabar=(function(){
     $("dbJson").disabled = ocupado;
     $("dbCerrar").disabled = ocupado;
     $("dbFile").disabled = ocupado;
+    $("dbNubeReintentar").disabled = ocupado;
+    $("dbOriginal").disabled = ocupado;
+    $("dbDescargar").disabled = ocupado;
+    $("dbNubeDescargar").disabled = ocupado || !hayNube;
     $("dbFileName").textContent = archivo ? (archivo.name+" · "+mb(archivo.size)) : "Ninguna base elegida";
   }
   function limpiarResultado(){
-    salida=null; $("dbDescargaRow").hidden=true; $("dbLog").hidden=true; $("dbLog").textContent=""; estado("");
+    salida=null; prepP=null; resumenOk=""; t0=0;
+    $("dbDescargaRow").hidden=true; $("dbNubeFallo").hidden=true; $("dbLog").hidden=true; $("dbLog").textContent=""; estado("");
+  }
+  function pintarNube(fila){
+    var el=$("dbNubeInfo");
+    function pinta(f){
+      hayNube=!!f;
+      el.textContent = f ? (f.nombre+" · "+respaldoNube.fechaHora(f.subido_at)+(f.subido_por_nombre?" · por "+f.subido_por_nombre:"")+" · "+mb(f.bytes_gz||0)+" comprimida")
+                         : "Aún no hay respaldo en la nube.";
+      refrescar();
+    }
+    if(fila!==undefined){ pinta(fila); return; }
+    hayNube=false; el.textContent="Consultando el respaldo en la nube…"; refrescar();
+    respaldoNube.info().then(pinta, function(e){ hayNube=false; el.textContent="No se pudo consultar el respaldo en la nube: "+respaldoNube.mensaje(e)+"."; refrescar(); });
   }
   function abrir(){
     var j=repGrabarJson();
@@ -6832,6 +6980,7 @@ var dbGrabar=(function(){
     $("dbResumen").innerHTML="Se grabarán <b>"+j.n+"</b> instrumento(s): "+esc(j.tags.join(", "))+".";
     if(!ocupado && !salida) limpiarResultado();
     refrescar();
+    if(!ocupado) pintarNube();
     $("dbModal").hidden=false; document.body.classList.add("modal-open");
   }
   function cerrar(){
@@ -6874,6 +7023,36 @@ var dbGrabar=(function(){
       };
     });
   }
+  function mensajeLectura(e){
+    if(e && e.name==="NotReadableError") return "La base cambió en el disco desde que la elegiste (¿DPCTrack la tiene abierta?). Ciérrala y vuelve a elegir la base.";
+    return (e&&e.message)||String(e);
+  }
+  /* Guarda la base ORIGINAL en la nube antes de entregar la actualizada (con reintentos). */
+  function respaldar(){
+    ocupado=true; refrescar();
+    $("dbNubeFallo").hidden=true; $("dbDescargaRow").hidden=true;
+    if(!prepP){ prepP=respaldoNube.preparar(archivo, null, tags); prepP.then(null,function(){}); }
+    fase=resumenOk+" Guardando la base <b>original</b> en la nube…"; iniciarReloj();
+    return respaldoNube.subirConReintentos(prepP, function(n,tot){
+      if(n>1){ fase=resumenOk+" Reintentando el respaldo en la nube ("+n+" de "+tot+")…"; tick(); }
+    }).then(function(fila){
+      terminar();
+      estado(resumenOk+" <b>Respaldo de la base original guardado en la nube</b> ("+mb((fila&&fila.bytes_gz)||0)+" comprimida). Ya puedes descargar la base actualizada y llevarla a DPCTrack.","ok");
+      $("dbDescargaRow").hidden=false;
+      pintarNube(fila);
+    }, function(e){
+      terminar();
+      if(e && e.name==="NotReadableError"){
+        salida=null; prepP=null;
+        estado("<b>No descargues nada.</b> "+esc(mensajeLectura(e))+" Luego graba de nuevo.","err");
+        return;
+      }
+      prepP=prepP && prepP.then(null,function(){ return null; }).then(function(p){ return p || respaldoNube.preparar(archivo, null, tags); });   // si falló la preparación, se rehace al reintentar
+      if(prepP) prepP.then(null,function(){});
+      estado(resumenOk+" <b>No se pudo guardar el respaldo en la nube</b>: "+esc(respaldoNube.mensaje(e))+". Puedes <b>reintentar</b>, o descargar la base <b>original</b> (guárdala como respaldo) y la <b>actualizada</b>.","warn");
+      $("dbNubeFallo").hidden=false; $("dbDescargaRow").hidden=false;
+    });
+  }
   function procesar(){
     if(ocupado || !archivo) return;
     var f=archivo;
@@ -6884,41 +7063,55 @@ var dbGrabar=(function(){
     if(!/\.mdb$/i.test(f.name)){ estado("<b>No se grabó nada.</b> Elige la base de DPCTrack2 con extensión <b>.mdb</b>.","err"); return; }
     var j=repGrabarJson();
     if(!j){ estado("No hay reportes cargados.","err"); return; }
+    tags=j.tags;
     ocupado=true; refrescar();
-    var t0=Date.now(), fase="Leyendo la base…";
-    var tick=function(){ estado(fase+" <span class=\"cloudst\">("+Math.round((Date.now()-t0)/1000)+" s)</span>"); };
-    tick(); reloj=setInterval(tick, 1000);
+    fase="Leyendo la base…"; t0=Date.now(); iniciarReloj();
     var ahora=ahoraIso();
     leerArchivo(f).then(function(buf){
+      prepP=respaldoNube.preparar(f, buf, tags);           // huella (antes de transferir el buffer) + gzip en paralelo
+      prepP.then(null,function(){});
       fase="Grabando "+j.n+" instrumento(s) y verificando la base… (puede tardar hasta un minuto; no cierres la página)"; tick();
       return enWorker(buf, j.text, ahora, f.name).catch(function(e){
-        if(e && e.sinWorker) return enHiloPrincipal(buf, j.text, ahora, f.name);
+        if(e && e.sinWorker) return enHiloPrincipal(buf.byteLength?buf:null, j.text, ahora, f.name);
         throw e;
       });
     }).then(function(out){
-      terminar();
       var r=out.res||{};
       if(!r.ok){
-        estado("<b>No se grabó nada.</b> "+esc(r.error||"Error desconocido")+"<br>La base original no cambió. Si el problema sigue, usa la Opción 2 (JSON + grabar.bat).","err");
+        terminar(); prepP=null;
+        estado("<b>No se grabó nada.</b> "+esc(r.error||"Error desconocido")+"<br>La base original no cambió y el respaldo de la nube no se tocó. Si el problema sigue, usa la Opción 2 (JSON + grabar.bat).","err");
         return;
       }
       var log=(r.log||[]).join("\n");
       if(r.verificacion) log+="\nVerificación: OK ("+r.verificacion.tablas+" tablas, "+r.verificacion.indices+" índices, "+r.verificacion.clavesBuscadas+" claves encontradas)";
       $("dbLog").textContent=log; $("dbLog").hidden=false;
       if(!r.insertados){
-        estado("No se grabó ninguna calibración: todos los instrumentos se omitieron (sin calibración previa en esa base para usar de plantilla). No hace falta descargar la base.","warn");
+        terminar(); prepP=null;
+        estado("No se grabó ninguna calibración: todos los instrumentos se omitieron (sin calibración previa en esa base para usar de plantilla). No hace falta descargar la base y el respaldo de la nube no se tocó.","warn");
         return;
       }
       salida={ blob:new Blob(out.partes,{type:"application/octet-stream"}), nombre:f.name };
-      estado("<b>Base actualizada y verificada.</b> "+r.insertados+" calibración(es) grabada(s)"+(r.omitidos?", "+r.omitidos+" omitida(s)":"")+
-        ". Descárgala y llévala a DPCTrack (reemplaza la base anterior; guarda una copia de la anterior si quieres).","ok");
-      $("dbDescargaInfo").textContent=f.name+" · "+mb(salida.blob.size)+" · "+((Date.now()-t0)/1000).toFixed(0)+" s";
-      $("dbDescargaRow").hidden=false;
+      $("dbDescargaInfo").textContent=f.name+" · "+mb(salida.blob.size);
+      resumenOk="<b>Base actualizada y verificada:</b> "+r.insertados+" calibración(es) grabada(s)"+(r.omitidos?", "+r.omitidos+" omitida(s)":"")+".";
+      return respaldar();
     }).catch(function(e){
-      terminar();
-      estado("<b>No se grabó nada.</b> "+esc((e&&e.message)||e)+"<br>La base original no cambió. Puedes usar la Opción 2 (JSON + grabar.bat).","err");
+      terminar(); prepP=null;
+      estado("<b>No se grabó nada.</b> "+esc(mensajeLectura(e))+"<br>La base original no cambió. Puedes usar la Opción 2 (JSON + grabar.bat).","err");
     });
-    function terminar(){ clearInterval(reloj); reloj=null; ocupado=false; refrescar(); }
+  }
+  function descargarNube(){
+    if(ocupado || !hayNube) return;
+    ocupado=true; refrescar();
+    estadoNube("Descargando el respaldo de la nube…");
+    respaldoNube.descargar().then(function(d){
+      ocupado=false; refrescar();
+      triggerBlob(d.blob, d.nombre);
+      if(d.shaOk) estadoNube("Descargada <b>"+esc(d.nombre)+"</b> (huella verificada). Para usarla en DPCTrack, renómbrala quitando <b>_ORIGINAL_…</b>.","ok");
+      else estadoNube("Descargada <b>"+esc(d.nombre)+"</b>, pero su huella <b>no coincide</b> con la registrada. Revísala antes de usarla.","warn");
+    }, function(e){
+      ocupado=false; refrescar();
+      estadoNube("No se pudo descargar el respaldo: "+esc(respaldoNube.mensaje(e))+".","err");
+    });
   }
   (function wire(){
     $("dbFile").addEventListener("change", function(e){
@@ -6928,7 +7121,10 @@ var dbGrabar=(function(){
       if(archivo && /backup/i.test(archivo.name)) estado("Esa base parece la <b>_backup</b> (solo consulta). Elige la base <b>editable</b>.","err");
     });
     $("dbProcesar").addEventListener("click", procesar);
-    $("dbDescargar").addEventListener("click", function(){ if(salida) triggerBlob(salida.blob, salida.nombre); });
+    $("dbDescargar").addEventListener("click", function(){ if(salida && !ocupado) triggerBlob(salida.blob, salida.nombre); });
+    $("dbNubeReintentar").addEventListener("click", function(){ if(salida && !ocupado) respaldar(); });
+    $("dbOriginal").addEventListener("click", function(){ if(salida && archivo && !ocupado) triggerBlob(archivo, respaldoNube.nombreOriginal(archivo.name)); });
+    $("dbNubeDescargar").addEventListener("click", descargarNube);
     $("dbJson").addEventListener("click", function(){ if(!ocupado) repGrabar(); });
     $("dbCerrar").addEventListener("click", cerrar);
     $("dbModal").addEventListener("click", function(e){ if(e.target===$("dbModal")) cerrar(); });
@@ -6985,11 +7181,14 @@ var sb=(function(){
     var pre=Promise.resolve();
     if(o.auth!==false && !o.noRetry && needsRefresh()) pre=refresh().then(null,function(){});   // refresco proactivo; si falla se intenta igual
     return pre.then(function(){
-      var h={"apikey":SB_ANON_KEY,"Content-Type":"application/json","Accept":"application/json"};
+      var h={"apikey":SB_ANON_KEY,"Content-Type":(o.raw!=null?(o.contentType||"application/octet-stream"):"application/json"),"Accept":"application/json"};
       if(o.auth!==false && S.access) h["Authorization"]="Bearer "+S.access;
       if(o.prefer) h["Prefer"]=o.prefer;
-      return f(SB_URL+path,{method:o.method||"GET",headers:h,body:(o.body!=null)?JSON.stringify(o.body):undefined});
+      if(o.headers) Object.keys(o.headers).forEach(function(k){ h[k]=o.headers[k]; });
+      var body=(o.raw!=null)?o.raw:((o.body!=null)?JSON.stringify(o.body):undefined);   // raw: Blob/binario (Storage)
+      return f(SB_URL+path,{method:o.method||"GET",headers:h,body:body});
     }).then(function(r){
+      if(r.ok && o.as==="blob") return r.blob();                                       // descarga binaria (Storage)
       return r.text().then(function(t){
         var b=null; try{ b=t?JSON.parse(t):null; }catch(e){}
         if(r.ok) return b;

@@ -135,3 +135,69 @@ create policy "reportes_delete_own_or_admin" on public.reportes for delete to au
 revoke all on public.profiles, public.reportes from anon;
 grant select, update on public.profiles to authenticated;
 grant select, insert, update, delete on public.reportes to authenticated;
+
+-- =====================================================================================================
+-- RESPALDO EN LA NUBE DE LA BASE DPCTrack ORIGINAL (botón "Grabar a la base de datos", Opción 1)
+-- Antes de entregar la base actualizada, la página sube la base ORIGINAL comprimida (gzip) a un bucket
+-- PRIVADO. Existe SIEMPRE UN SOLO respaldo: ruta fija 'base_original.mdb.gz' (cada grabado lo reemplaza) y
+-- una tabla de UNA sola fila con sus datos. Solo usuarios APROBADOS pueden subirlo o descargarlo.
+-- Se puede volver a ejecutar sin problema.
+-- =====================================================================================================
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('respaldo-base', 'respaldo-base', false, 52428800, array['application/gzip'])
+on conflict (id) do update
+  set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "respaldo_base_select" on storage.objects;
+create policy "respaldo_base_select" on storage.objects for select to authenticated
+  using (bucket_id = 'respaldo-base' and public.is_approved());
+drop policy if exists "respaldo_base_insert" on storage.objects;
+create policy "respaldo_base_insert" on storage.objects for insert to authenticated
+  with check (bucket_id = 'respaldo-base' and public.is_approved());
+drop policy if exists "respaldo_base_update" on storage.objects;
+create policy "respaldo_base_update" on storage.objects for update to authenticated
+  using (bucket_id = 'respaldo-base' and public.is_approved())
+  with check (bucket_id = 'respaldo-base' and public.is_approved());
+drop policy if exists "respaldo_base_delete" on storage.objects;
+create policy "respaldo_base_delete" on storage.objects for delete to authenticated
+  using (bucket_id = 'respaldo-base' and public.is_approved());
+
+create table if not exists public.respaldo_base (
+  id                smallint primary key default 1 check (id = 1),     -- una sola fila
+  nombre            text   not null,                                    -- nombre del archivo .mdb original
+  bytes             bigint not null,                                    -- tamaño sin comprimir
+  bytes_gz          bigint not null,                                    -- tamaño comprimido en la nube
+  sha256            text   not null,                                    -- huella del .mdb original (verifica la descarga)
+  instrumentos      jsonb  not null default '[]'::jsonb,                -- TAGs del grabado que motivó el respaldo
+  subido_por        uuid references public.profiles(id) on delete set null,
+  subido_por_nombre text   not null default '',
+  subido_at         timestamptz not null default now()
+);
+alter table public.respaldo_base enable row level security;
+
+-- Quién y cuándo lo fija el servidor (no se confía en el cliente).
+create or replace function public.respaldo_base_stamp() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  new.id := 1;
+  new.subido_por := auth.uid();
+  new.subido_por_nombre := coalesce((select p.full_name from public.profiles p where p.id = auth.uid()), '');
+  new.subido_at := now();
+  return new;
+end $$;
+drop trigger if exists respaldo_base_stamp on public.respaldo_base;
+create trigger respaldo_base_stamp before insert or update on public.respaldo_base
+  for each row execute function public.respaldo_base_stamp();
+
+drop policy if exists "respaldo_base_row_select" on public.respaldo_base;
+create policy "respaldo_base_row_select" on public.respaldo_base for select to authenticated
+  using (public.is_approved());
+drop policy if exists "respaldo_base_row_insert" on public.respaldo_base;
+create policy "respaldo_base_row_insert" on public.respaldo_base for insert to authenticated
+  with check (public.is_approved());
+drop policy if exists "respaldo_base_row_update" on public.respaldo_base;
+create policy "respaldo_base_row_update" on public.respaldo_base for update to authenticated
+  using (public.is_approved()) with check (public.is_approved());
+
+revoke all on public.respaldo_base from anon;
+grant select, insert, update on public.respaldo_base to authenticated;

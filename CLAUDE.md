@@ -48,7 +48,8 @@ datos_calibracion.json <- Datos de calibración portables (para adjuntar en la a
 mdbwriter/            <- Fuentes de src/grabar_mdb.js (Java + parche de Jackcess + reescritor + shims + pruebas).
                          Ver mdbwriter/README.md. work/ y app/target/ no se versionan.
 supabase/schema.sql   <- Esquema Supabase (profiles, reportes, trigger handle_new_user, helpers is_admin/
-                         is_approved, RLS). Sin secretos; se pega en el SQL Editor del proyecto.
+                         is_approved, RLS; al final: bucket privado respaldo-base + tabla respaldo_base del
+                         respaldo único de la base original). Sin secretos; se pega en el SQL Editor del proyecto.
 .gitignore            <- Excluye *.mdb y zzz/ (no publicar base ni binarios).
 20260810_dpctrack2_backup.mdb    <- Base DPCTrack2 (Jet 4, clave en zzz\PasswordReset.exe). SOLO CONSULTA (ver regla). NO PUBLICAR.
 20260810_dpctrack2_editable.mdb  <- Copia de trabajo de la base (aquí SÍ se puede modificar). NO PUBLICAR.
@@ -207,8 +208,21 @@ está en medio y el archivo se regenera).
   `dbGrabar.abrir()`). **Opción 1 (en línea):** el usuario elige la base editable `.mdb` de su PC (`#dbFile`), se graba
   **en memoria del navegador** con `MDBW_FACTORY` (`src/grabar_mdb.js`) dentro de un **Web Worker** creado desde
   `MDBW_FACTORY.toString()` + `mdbwEjecutar` + `mdbwWorkerMain` (si no se puede crear, corre en el hilo principal),
-  se **autoverifica** (Verificador: conteos, todos los índices, claves y calibraciones completas) y se ofrece
-  **"Descargar base actualizada"** con el mismo nombre. Recibe **exactamente el mismo texto JSON** que la Opción 2
+  se **autoverifica** (Verificador: conteos, todos los índices, claves y calibraciones completas), se **respalda la
+  base ORIGINAL en la nube** (módulo `respaldoNube`, ver abajo) y solo entonces se ofrece
+  **"Descargar base actualizada"** con el mismo nombre. **Respaldo único en la nube** (`respaldoNube`): bucket
+  PRIVADO `respaldo-base` con ruta fija `base_original.mdb.gz` (gzip con `CompressionStream`; 81 MB → ~6 MB) +
+  tabla de UNA fila `public.respaldo_base` (`nombre, bytes, bytes_gz, sha256, instrumentos`; `subido_por*` y
+  `subido_at` los fija un trigger); RLS: solo aprobados (`is_approved()`); SQL al final de `supabase/schema.sql`.
+  Flujo: `preparar(file, buf, tags)` calcula SHA-256 del buffer ANTES de transferirlo al worker y comprime en
+  paralelo; tras grabar OK, `subirConReintentos` (3 intentos a 0/3/10 s, solo red/5xx/429; 403/413 fallan de una)
+  hace POST con `x-upsert` (el anterior solo se reemplaza cuando el nuevo subió), upsert de la fila `on_conflict=id`
+  y borra cualquier otro objeto del bucket. Si falla: botones "Reintentar respaldo" (`#dbNubeReintentar`) y
+  "Descargar base original" (`#dbOriginal`, `triggerBlob(File)` como `<base>_ORIGINAL_<aaaa-mm-dd_hhmm>.mdb`)
+  además de la actualizada. Grabado fallido u omitido → la nube NO se toca. `NotReadableError` (la base cambió en
+  disco) → no ofrece descargas. Sección "Respaldo en la nube" del diálogo: `info()` (`#dbNubeInfo`) y
+  `descargar()` (`#dbNubeDescargar`: descomprime con `DecompressionStream`, verifica SHA-256, baja `_ORIGINAL_…`).
+  `sb.req` acepta `raw` (Blob, `contentType`), `headers` extra y `as:"blob"` (Storage). Recibe **exactamente el mismo texto JSON** que la Opción 2
   (`repGrabarJson()`), rechaza nombres con "backup" y no `.mdb`, no envía nada a servidores y no toca el archivo
   original. Es un **port fiel de `grabar_reporte.ps1`** (`mdbwriter/app/.../GrabarMdb.java`): **si cambias la lógica
   de grabado, cambia los dos** y corre `mdbwriter/test/run_case.sh` (ACE vs port: 8 tablas idénticas; JS = JVM byte a
@@ -421,7 +435,10 @@ de DPCTrack de referencia (`PT-U7122.pdf`).
 Para **grabar en línea** (Opción 1), siempre sobre COPIAS de la base editable y con la clave en `DPC_CLAVE`:
 `mdbwriter/test/run_case.sh` (grabar_reporte.ps1 vs port: volcado de 8 tablas + conteos idénticos; JS = JVM byte a
 byte; índices con DAO), `mdbwriter/test/e2e_navegador.js` (Chrome real headless por DevTools: diálogo, rechazo de
-_backup, Web Worker, descarga de base y JSON, original intacto, file://) y, sobre la base descargada,
+_backup, archivo dañado, Web Worker, descarga de base y JSON, original intacto, file://; **simula Supabase** con
+`Fetch.requestPaused`: respaldo idéntico a la original tras gunzip, uno solo en el bucket, reemplazo en el 2.º
+grabado, nube caída → 3 intentos + descargas original/actualizada + reintento, 403 sin reintentos, descarga del
+respaldo con huella) y, sobre la base descargada,
 `verify_index.ps1` + compactado DAO. Tras la prueba del navegador se graba con `grabar.bat` el JSON descargado y
 la base debe quedar idéntica a la del navegador.
 Verificación real: abrir `index.html`, pegar TAGs variados (PT, FT, FIC, PIC, PV, TE, SOV, WT, PIT-…) y

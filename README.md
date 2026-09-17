@@ -98,7 +98,8 @@ por** se autollenan con el usuario con sesión (editables). Lo guardado se reabr
 
 **Grabar a la base de datos:** el botón abre un diálogo con dos opciones que dejan la base igual:
 **(1) actualizar la base en línea** (eliges la base editable `.mdb` del PC donde estés, la página la graba y
-verifica dentro del navegador, sin enviarla a ningún servidor, y la **descargas** para llevarla a DPCTrack) o
+verifica dentro del navegador, guarda la base **original** como **único respaldo** privado en la nube (con
+reintentos; si no sube, deja descargar la original y la actualizada) y la **descargas** para llevarla a DPCTrack) o
 **(2) descargar el JSON** con todos los instrumentos para `grabar.bat` (el flujo de siempre). El paso a paso
 está en **[ACTUALIZAR-BASE-DE-DATOS.md](ACTUALIZAR-BASE-DE-DATOS.md)**.
 
@@ -174,6 +175,10 @@ El backend es un proyecto gratuito de [Supabase](https://supabase.com) (Postgres
 5. **Primer administrador**: regístrate desde la app con tu correo y en el SQL Editor ejecuta
    `update public.profiles set role='admin', approved=true where email='TU_CORREO';`. Desde ese momento
    verás la pestaña **Usuarios**.
+6. **Respaldo de la base en la nube** (para "Grabar a la base de datos" en línea): en el SQL Editor ejecuta la
+   sección final de `supabase/schema.sql` (*RESPALDO EN LA NUBE DE LA BASE DPCTrack ORIGINAL*). Crea el bucket
+   **privado** `respaldo-base` (un único archivo `base_original.mdb.gz`), sus políticas (solo usuarios aprobados)
+   y la tabla de una fila `respaldo_base`. Se puede ejecutar de nuevo sin problema.
 
 > Plan gratuito: el proyecto se **pausa tras ~7 días sin uso** (botón *Restore* en el dashboard); mientras
 > está pausado la app se comporta como "sin conexión". Eliminar un usuario en *Authentication → Users*

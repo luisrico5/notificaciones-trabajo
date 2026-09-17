@@ -7,8 +7,8 @@ Al pulsar **"Grabar a la base de datos"** (pestaña *Reporte de calibración*) s
 opciones que dejan la base exactamente igual**:
 
 - **Opción 1 · Actualizar la base aquí mismo (en línea):** eliges la base editable `.mdb` del PC donde estés,
-  la página la actualiza dentro del navegador y la descargas lista para DPCTrack. No hace falta PowerShell,
-  `grabar.bat` ni la clave.
+  la página la actualiza dentro del navegador, guarda la base **original** como respaldo en la nube y la
+  descargas lista para DPCTrack. No hace falta PowerShell, `grabar.bat` ni la clave.
 - **Opción 2 · Descargar el JSON (para grabar.bat):** el flujo de siempre, descrito más abajo.
 
 ---
@@ -20,9 +20,26 @@ opciones que dejan la base exactamente igual**:
 3. **Grabar en la base** → la página graba todo (tarda unos segundos; la página sigue respondiendo). Al terminar
    muestra el mismo resumen que `grabar.bat` (`OK <tag> -> CalibrationID=…`, `spec actualizada…`,
    `OMITIDO …`) y la línea **"Verificación: OK"**.
-4. **Descargar base actualizada** → se descarga con **el mismo nombre** que la que elegiste (normalmente en
-   *Descargas*). Llévala a la carpeta de DPCTrack **reemplazando la anterior** (guarda una copia de la anterior
-   si quieres poder volver atrás) y ábrela en DPCTrack2.
+4. **Respaldo automático en la nube** → antes de dejarte descargar, la página sube la base **original** (tal como
+   la elegiste, antes de grabar) comprimida a la nube de la app. Verás *"Respaldo de la base original guardado en
+   la nube"*. Si no hay internet o Supabase no responde, lo **reintenta 3 veces**; si aun así no sube, te deja
+   **Reintentar respaldo** o descargar **la base original** (con `_ORIGINAL_<fecha>` en el nombre, guárdala como
+   respaldo) **y la actualizada**.
+5. **Descargar base actualizada** → se descarga con **el mismo nombre** que la que elegiste (normalmente en
+   *Descargas*). Llévala a la carpeta de DPCTrack **reemplazando la anterior** y ábrela en DPCTrack2.
+
+### Respaldo en la nube (la base original)
+
+- **Siempre hay UNO solo:** es la base **original del último grabado en línea**. Cada grabado nuevo lo
+  **reemplaza** (el anterior solo desaparece cuando el nuevo terminó de subir, así nunca te quedas sin respaldo).
+  Si un grabado falla o se omiten todos los instrumentos, el respaldo **no se toca**.
+- **Privado:** lo pueden subir y descargar solo los **usuarios aprobados** de la app. Va comprimido (una base de
+  81 MB ocupa unos 6 MB) y con su huella SHA-256.
+- **Para volver atrás:** en el mismo diálogo, sección **Respaldo en la nube**, pulsa **Descargar respaldo de la nube**.
+  Baja como `<nombre>_ORIGINAL_<aaaa-mm-dd_hhmm>.mdb` y la página comprueba su huella. **Renómbrala** quitando
+  `_ORIGINAL_…` y ponla en la carpeta de DPCTrack en lugar de la actual.
+- Requiere haber ejecutado una vez la sección de respaldo de `supabase/schema.sql` (ver README, *Configurar
+  Supabase*). Si falta, la página lo dice y ofrece descargar original y actualizada.
 
 Cómo funciona y por qué es seguro:
 
@@ -30,8 +47,9 @@ Cómo funciona y por qué es seguro:
   un port de `src\grabar_reporte.ps1` (plantilla = última calibración, `CALIBRAT`/`CalGroups`/`CALDET`/
   `CALTEST`/`PCNotes`, **especificación** `InstSpecGroup`+`INSTSPEC` y contador **`IDs`**). Se probó grabando
   los mismos JSON reales con ambos caminos: las 8 tablas quedan **idénticas fila por fila**.
-- **Nada sale del PC:** la base se lee y se escribe **en la memoria del navegador**; no se sube a ningún servidor
-  (ni a Supabase). El archivo original del PC **no se modifica**: lo que descargas es una copia actualizada.
+- **En memoria del navegador:** la base se lee y se graba **en el navegador**; a la nube solo sube la base
+  **original** como respaldo privado (ver arriba). El archivo del PC **no se modifica**: lo que descargas es una
+  copia actualizada.
 - **Autoverificación:** antes de ofrecer la descarga, la página reabre la base grabada y comprueba conteos de filas,
   todos los índices de las tablas tocadas y que cada calibración nueva esté completa. Si algo no cuadra, **no ofrece
   la descarga** y dice "No se grabó nada".
@@ -160,6 +178,8 @@ Dashboard (pestaña Reporte)                     PowerShell                     
 ---
 
 | En la página: `No se grabó nada. … parece la _backup` | Elegiste la base de solo consulta. Elige la base **editable**. |
+| En la página: `No se pudo guardar el respaldo en la nube` | Sin internet, Supabase pausado (botón *Restore* en su dashboard), cuenta sin aprobar o falta ejecutar la sección de respaldo del SQL. Pulsa *Reintentar respaldo*, o descarga la **original** y la **actualizada** y guarda la original como respaldo. |
+| En la página: `La base cambió en el disco desde que la elegiste` | DPCTrack (o alguien) modificó la base mientras se grababa. No descargues nada: cierra DPCTrack, vuelve a elegir la base y graba de nuevo. |
 | En la página: `No se grabó nada. <mensaje>` | La base no se pudo abrir/grabar/verificar (archivo que no es de DPCTrack2, dañado, o memoria insuficiente). La base original no cambió; usa la Opción 2. |
 
 ---

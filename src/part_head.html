@@ -399,7 +399,7 @@
     <p id="dbResumen" class="hint" style="margin-top:0"></p>
 
     <h3>Opción 1 · Actualizar la base aquí mismo</h3>
-    <p class="hint" style="margin-top:0">Elige la base <b>editable</b> de DPCTrack2 (.mdb) que tengas en este PC. Se actualiza <b>dentro del navegador</b> con las mismas reglas que <b>grabar.bat</b> (calibración + especificación + contador de IDs), se verifica, y al final la <b>descargas</b> para llevarla a DPCTrack. La base no se envía a ningún servidor y el archivo original de tu PC no se modifica.</p>
+    <p class="hint" style="margin-top:0">Elige la base <b>editable</b> de DPCTrack2 (.mdb) que tengas en este PC. Se actualiza <b>dentro del navegador</b> con las mismas reglas que <b>grabar.bat</b> (calibración + especificación + contador de IDs), se verifica, y al final la <b>descargas</b> para llevarla a DPCTrack. Antes de entregártela, la página guarda la base <b>original</b> (comprimida) como <b>respaldo en la nube</b> privada de la app: siempre hay <b>un solo respaldo</b>, el de la última base que actualizaste. El archivo de tu PC no se modifica.</p>
     <div class="dbrow">
       <label class="btn filelbl">Elegir base .mdb<input type="file" id="dbFile" accept=".mdb" hidden></label>
       <span id="dbFileName" class="cloudst dbfile">Ninguna base elegida</span>
@@ -413,12 +413,26 @@
       <button id="dbDescargar" class="btn primary">Descargar base actualizada</button>
       <span id="dbDescargaInfo" class="cloudst dbfile"></span>
     </div>
+    <div id="dbNubeFallo" class="dbrow" hidden>
+      <button id="dbNubeReintentar" class="btn">Reintentar respaldo</button>
+      <button id="dbOriginal" class="btn">Descargar base original</button>
+    </div>
 
     <h3>Opción 2 · Descargar el JSON (para grabar.bat)</h3>
     <p class="hint" style="margin-top:0">El flujo de siempre: descarga el JSON con todos los instrumentos y arrástralo sobre <b>grabar.bat</b> junto con la base editable.</p>
     <div class="dbrow">
       <button id="dbJson" class="btn">Descargar JSON</button>
     </div>
+
+    <h3>Respaldo en la nube</h3>
+    <p class="hint" style="margin-top:0">Es la base <b>original</b> tal como estaba antes del último grabado en línea (solo existe uno). Descárgala si necesitas volver atrás: baja con <b>_ORIGINAL_</b> y la fecha en el nombre; quítalo al renombrarla antes de llevarla a DPCTrack.</p>
+    <div class="dbrow">
+      <span id="dbNubeInfo" class="cloudst dbfile">Aún no consultado.</span>
+    </div>
+    <div class="dbrow">
+      <button id="dbNubeDescargar" class="btn" disabled>Descargar respaldo de la nube</button>
+    </div>
+    <div id="dbNubeEstado" class="dbst" aria-live="polite"></div>
   </section>
 </div>
 
