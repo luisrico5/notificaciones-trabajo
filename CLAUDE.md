@@ -351,8 +351,16 @@ repo**), `AUTH_KEY="noti_auth_v1"`, `PENDING_KEY="noti_pending_v1"`, `CURRENT_US
   o `PATCH` por `_cloudId`. Fallo offline/5xx → **cola** `noti_pending_v1` (`flushPending` al arrancar, al
   volver `online`, tras guardar OK o con "Reintentar ahora"); 4xx (403 pendiente/revocado, 413, 23505) →
   no se encola, `_cloudError`. Estado visible con `cloudBadge(row)` (cardHtml) y `#repNubeMsg`
-  (`renderRepStatus`). `listar/abrir/dlPdf/dlJson/dlTxt/eliminar` en la pestaña **Mis reportes**
+  (`renderRepStatus`). `listar/abrir/abrirTodos/dlPdf/dlJson/dlTxt/eliminar` en la pestaña **Mis reportes**
   (`switchTab("mis")`); `abrir` usa `repBatchPut` (reemplaza en `REP_BATCH` por TAG) y `repSelectShow`.
+  **`abrirTodos`** (botón `#misAbrirTodos`, "Abrir todos"): un solo `select("*")` con `filtrosActuales()`
+  (los mismos filtros de tipo/usuario que usa `listar`; lo comparten ambos), pide confirmación y aplica los
+  payloads **del más antiguo al más nuevo** (`items.reverse()`, así el lote queda en el orden en que se
+  guardó) — calibraciones con `repBatchPut` + `renderRepSelect`, notificaciones reemplazando por `ot`+`tag`
+  o `push` + `renderRows` — fija `_cloudId/_cloudAt/_cloudSig` (no cuentan como trabajo sin guardar),
+  **deja el desplegable sin selección** (como tras el primer pegado; si `repState` sigue en el lote la
+  conserva), pasa a la pestaña Reporte si hubo calibraciones y resume en `#misMsg`. Un payload dañado se
+  cuenta aparte y no corta el resto.
   El botón "Guardar" de cada notificación pasó a **"Guardar en mi cuenta"** (marca `saved` + `guardarNoti`);
   botones nuevos `#btnNubeTodas`, `#repGuardarNube`, `#repGuardarNubeTodos`.
 - **`adminUsers`** (solo `auth.isAdmin()`): pestaña **Usuarios** (`#tabAdmin`, oculta si no es admin):
@@ -450,8 +458,11 @@ Desde el login, el stub debe proveer `localStorage`, `sessionStorage`, `navigato
 `window.addEventListener` y un `fetch` simulado (`auth.init` corre al cargar; sin caché de sesión NO llama a
 la red). **`node mdbwriter/test/app/correr.js`** extrae el JS de `index.html` y corre `e2e_auth.js`, `e2e_nube_node.js`
 (respaldo en la nube: `sb.req` binario, reintentos, 403, gzip, huella) y `e2e_datos_node.js` (datos compartidos: no
-retroceder, publicar, nube más nueva, pendiente sin red, sincronizar, lote editado) y `e2e_salida_node.js` (trabajo sin
-guardar y aviso al cerrar). En Chrome real: `node mdbwriter/test/e2e_salida.js <index.html|URL> <copia.mdb> <carpeta>`
+retroceder, publicar, nube más nueva, pendiente sin red, sincronizar, lote editado), `e2e_salida_node.js` (trabajo sin
+guardar y aviso al cerrar) y `e2e_abrir_node.js` ("Abrir todos": orden del lote, sin duplicar, filtros, cancelar,
+sin conexión, lista vacía, payload dañado). En Chrome real: `node mdbwriter/test/e2e_abrir.js <index.html|URL>
+<carpeta>` (guardar un lote en la cuenta → vaciar la app → "Abrir todos" → elegir en los desplegables, editar y
+volver a guardar sin duplicar) y `node mdbwriter/test/e2e_salida.js <index.html|URL> <copia.mdb> <carpeta>`
 (orden de tarjetas; aviso `beforeunload` con clic real para la activación del usuario; quedarse → ventana; guardar
 todo; sin conexión; base sin descargar; salir igual; cerrar sesión). El arnés `e2e_auth.js` cubre: gate sin caché, arranque con caché, autollenado,
 round-trip calibración/notificación, wrapper `sb` (errores legibles, 401→refresh→reintento, offline,

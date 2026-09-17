@@ -362,9 +362,10 @@
       <span class="grow"></span>
       <select id="misKind"><option value="">Todos</option><option value="calibracion">Calibraciones</option><option value="notificacion">Notificaciones</option></select>
       <select id="misUser" hidden><option value="">Todos los usuarios</option></select>
+      <button id="misAbrirTodos" class="btn" style="margin-top:0">Abrir todos</button>
       <button id="misRefresh" class="btn ghost" style="margin-top:0">Actualizar</button>
     </div>
-    <p class="hint" style="margin-top:0">Reportes de calibración y notificaciones guardados en tu cuenta. <b>Abrir</b> los carga en su pestaña para seguir editando; <b>PDF / JSON / .txt</b> descargan tal como se guardaron; <b>Eliminar</b> los borra de la cuenta.</p>
+    <p class="hint" style="margin-top:0">Reportes de calibración y notificaciones guardados en tu cuenta. <b>Abrir</b> los carga en su pestaña para seguir editando; <b>Abrir todos</b> carga de una vez los de la lista y los eliges en el desplegable de cada pestaña, igual que al procesar un pegado; <b>PDF / JSON / .txt</b> descargan tal como se guardaron; <b>Eliminar</b> los borra de la cuenta.</p>
     <div id="misPend" hidden></div>
     <div id="misMsg" class="hint"></div>
     <div class="tbl-wrap"><div id="misList"></div></div>
@@ -456,7 +457,7 @@
   </section>
 </div>
 
-<footer>Funciona en tu navegador · Los reportes se guardan en tu cuenta (Supabase) · Sin conexión puedes generar .txt/PDF; guardar requiere internet · <span title="Fecha de compilación. Si no coincide con la última, recarga con Ctrl+Shift+R.">versión 2026-09-17 10:19</span></footer>
+<footer>Funciona en tu navegador · Los reportes se guardan en tu cuenta (Supabase) · Sin conexión puedes generar .txt/PDF; guardar requiere internet · <span title="Fecha de compilación. Si no coincide con la última, recarga con Ctrl+Shift+R.">versión 2026-09-17 13:16</span></footer>
 </div>
 <div id="reportPrint" aria-hidden="true"></div>
 <div id="authGate">
@@ -7795,12 +7796,18 @@ var misReportes=(function(){
       '</tbody></table></div>';
   }
   // ---- listar / abrir / descargar / eliminar ----
+  /* Filtros de la pestaña (tipo y, para el admin, usuario). Los comparten "listar" y "Abrir todos". */
+  function filtrosActuales(){
+    var q={order:"updated_at.desc",limit:200};
+    var ke=$("misKind"), kind=(ke&&ke.value)||""; if(kind) q.kind="eq."+kind;
+    var us=$("misUser"); if(us&&auth.isAdmin()&&us.value) q.user_id="eq."+us.value;
+    return q;
+  }
   function listar(){
     renderPend();
     var msg=$("misMsg"), list=$("misList"), cnt=$("misCount"); if(!list) return Promise.resolve();
-    var q={order:"updated_at.desc",limit:200};
-    var ke=$("misKind"), kind=(ke&&ke.value)||""; if(kind) q.kind="eq."+kind;
-    var us=$("misUser"); if(us){ us.hidden=!auth.isAdmin(); if(auth.isAdmin()&&us.value) q.user_id="eq."+us.value; }
+    var us=$("misUser"); if(us) us.hidden=!auth.isAdmin();
+    var q=filtrosActuales();
     if(!sb.isOnline()){ if(msg) msg.textContent="Sin conexión: no se puede consultar lo guardado en tu cuenta."; list.innerHTML=""; return Promise.resolve(); }
     if(msg) msg.textContent="Cargando…";
     return sb.from("reportes").select("id,user_id,kind,tag,ot,titulo,created_at,updated_at,profiles(full_name)",q).then(function(items){
@@ -7831,6 +7838,58 @@ var misReportes=(function(){
         currentId=r.id; renderRows(); switchTab("noti");
       }
     }, function(e){ alert(e.message); });
+  }
+  /* Abre DE UNA VEZ todo lo que muestra la lista (con los filtros actuales): las calibraciones van al lote
+     de la pestaña Reporte y las notificaciones a las órdenes cargadas, para elegirlas en el desplegable
+     igual que después de procesar un pegado. Lo que ya esté cargado con el mismo TAG/OT se reemplaza. */
+  function abrirTodos(){
+    var msg=$("misMsg"), btn=$("misAbrirTodos");
+    if(!sb.isOnline()){ if(msg) msg.textContent="Sin conexión: no se puede abrir lo guardado en tu cuenta."; return Promise.resolve(); }
+    if(btn) btn.disabled=true;
+    if(msg) msg.textContent="Abriendo…";
+    function fin(){ if(btn) btn.disabled=false; }
+    return sb.from("reportes").select("*",filtrosActuales()).then(function(items){
+      // De lo más antiguo a lo más nuevo, para que el lote quede en el mismo orden en que se guardó.
+      items=(items||[]).slice().reverse();
+      if(!items.length){ if(msg) msg.textContent="No hay nada guardado para abrir."; fin(); return; }
+      if(!confirm("Se abrirán "+items.length+" reporte(s) guardado(s) para editarlos.\n\nLo que ya tengas cargado con el mismo TAG (calibración) o la misma orden (notificación) se reemplaza por lo guardado en tu cuenta.\n\n¿Continuar?")){ if(msg) msg.textContent=""; fin(); return; }
+      var cal=0, noti=0, err=0;
+      items.forEach(function(x){
+        try{
+          if(x.kind==="calibracion"){
+            var st=deserializeCal(x.payload); st._cloudId=x.id; st._cloudAt=x.updated_at; st._cloudSig=JSON.stringify(serializeCal(st));
+            repBatchPut(st); cal++;
+          } else {
+            var r=deserializeNoti(x.payload); r._cloudId=x.id; r._cloudAt=x.updated_at; r._cloudSig=JSON.stringify(serializeNoti(r));
+            var kk=normTag(r.tag||""), i=-1;
+            rows.forEach(function(rr,ii){ if(String(rr.ot||"")===String(r.ot||"") && normTag(rr.tag||"")===kk) i=ii; });
+            if(i>=0) rows[i]=r; else rows.push(r);
+            noti++;
+          }
+        }catch(e){ err++; }
+      });
+      if(noti){ currentId=null; renderRows(); }
+      if(cal){
+        renderRepSelect();
+        var sel=$("repSelect"), idx=repState?REP_BATCH.indexOf(repState):-1, rm=document.getElementById("repMsg");
+        if(idx>=0){ if(sel) sel.value=String(idx); repSelectShow(idx); }
+        else {
+          repState=null; if(sel) sel.value="";
+          if(rm) rm.innerHTML=(cal===1?'Se abrió <b>1</b> reporte guardado':'Se abrieron <b>'+cal+'</b> reportes guardados')+' en tu cuenta. Elige uno en el desplegable para editarlo.';
+          repRenderForm();
+        }
+      }
+      var partes=[];
+      if(cal) partes.push(cal+(cal===1?" calibración":" calibraciones"));
+      if(noti) partes.push(noti+(noti===1?" notificación":" notificaciones"));
+      var dan=err?(err===1?" 1 no se pudo abrir (datos dañados).":(" "+err+" no se pudieron abrir (datos dañados).")):"";
+      if(msg) msg.textContent=partes.length
+        ? (((cal+noti)===1?"Se abrió ":"Se abrieron ")+partes.join(" y ")+"."+dan+
+           (noti?" Las notificaciones quedaron en el desplegable de la pestaña Notificaciones.":""))
+        : ("No se pudo abrir ninguno."+dan);
+      if(cal) switchTab("reporte"); else if(noti) switchTab("noti");
+      fin();
+    }, function(e){ if(msg) msg.textContent="No se pudo abrir: "+e.message; fin(); });
   }
   function dlPdf(id){ return fetchOne(id).then(function(x){ var st=deserializeCal(x.payload); return repPdfFrom(st,(st.rec.tag||"reporte")+".pdf"); }, function(e){ alert(e.message); }); }
   function dlJson(id){ return fetchOne(id).then(function(x){ var st=deserializeCal(x.payload), fn="grabar_"+(st.rec.tag||"reporte")+"_"+todayDMY().replace(/\//g,"")+".json";
@@ -7871,6 +7930,7 @@ var misReportes=(function(){
     });
     ["misKind","misUser"].forEach(function(id){ var s=$(id); if(s) s.addEventListener("change",function(){ listar(); }); });
     var mr=$("misRefresh"); if(mr) mr.addEventListener("click",function(){ listar(); });
+    var ma=$("misAbrirTodos"); if(ma) ma.addEventListener("click",function(){ abrirTodos(); });
     var bn=$("btnNubeTodas"); if(bn) bn.addEventListener("click",function(){ guardarNotiTodas(); });
     var g1=$("repGuardarNube"); if(g1) g1.addEventListener("click",function(){ guardarCal(repState); });
     var g2=$("repGuardarNubeTodos"); if(g2) g2.addEventListener("click",function(){ guardarCalTodos(); });
@@ -7878,7 +7938,7 @@ var misReportes=(function(){
   wire();
   return { serializeCal:serializeCal, deserializeCal:deserializeCal, serializeNoti:serializeNoti, deserializeNoti:deserializeNoti,
            itemCal:itemCal, itemNoti:itemNoti, guardar:guardar, guardarCal:guardarCal, guardarCalTodos:guardarCalTodos, guardarNoti:guardarNoti, guardarNotiTodas:guardarNotiTodas,
-           flushPending:flushPending, listar:listar, abrir:abrir, eliminar:eliminar, renderRepStatus:renderRepStatus, renderPend:renderPend,
+           flushPending:flushPending, listar:listar, abrir:abrir, abrirTodos:abrirTodos, eliminar:eliminar, renderRepStatus:renderRepStatus, renderPend:renderPend,
            updatePendBadge:function(){ updatePendBadge(loadQ()); }, pendientes:function(){ return myQ(); },
            sinGuardar:sinGuardar, guardarLista:guardarLista };
 })();

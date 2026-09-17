@@ -183,7 +183,7 @@ async function main() {
       await esperar("/\\b(ok|warn|err)\\b/.test(document.getElementById('dbDatosEstado').className)", 180000, "datos de calibración tras grabar");
       return { cls: (await ev("document.getElementById('dbDatosEstado').className")).replace("dbst", "").trim(), texto: await ev("document.getElementById('dbDatosEstado').textContent") };
     };
-    // Tarjeta 02: "Actualizar desde base .mdb".
+    // Tarjeta 03 (Mapeo): "Actualizar desde base .mdb".
     const actualizarDesdeBase = async (archivo) => {
       await ev("var e=document.getElementById('calBaseEstado'); e.className='dbst'; e.innerHTML=''; true");
       await setFile("#importBase", archivo);
@@ -210,7 +210,7 @@ async function main() {
   await P.ev(`repSelectShow(3); var el=document.querySelector('#repForm input[data-k="found"][data-g="0"][data-p="1"]'); el.value=String(REP_BATCH[3].groups[0].rows[1].hi+1); el.dispatchEvent(new Event('input',{bubbles:true})); true`);
   ok(await P.ev("REP_BATCH[3].groups[0].rows[1].found > REP_BATCH[3].groups[0].rows[1].hi"), "PT-U7122 punto 2 con Enc. fuera de límite (editado en el formulario)");
 
-  console.log("\n[1b] Tarjeta 02: 'Actualizar desde base .mdb' (solo lectura) y compartir con todos");
+  console.log("\n[1b] Tarjeta 03: 'Actualizar desde base .mdb' (solo lectura) y compartir con todos");
   await sleep(3500);   // deja pasar la sincronización del arranque (la nube aún no tiene datos)
   ok(await P.ev("CAL_OVERRIDE===null"), "arranca con los datos incrustados (la nube no tenía datos)");
   const baseDatos = copiaEn("datos", "base_para_datos.mdb"), hashDatos = hash(baseDatos);
@@ -220,7 +220,7 @@ async function main() {
   const idBase = (d1 && d1.base) ? d1.base.ultimoId : 0;
   ok(d1 && d1.base.nombre === "base_para_datos.mdb" && idBase > 0 && Object.keys(d1.tags).length > 1000, "datos en la nube (" + (d1 ? Object.keys(d1.tags).length : 0) + " instrumentos, última calibración n.º " + idBase + ")");
   ok(await P.ev("!!CAL_OVERRIDE && CAL_OVERRIDE.base.ultimoId===" + idBase + " && CAL_OVERRIDE.pendienteNube===false"), "aplicados en la app y marcados como compartidos");
-  ok(/Datos de la base base_para_datos\.mdb/.test(await P.ev("document.getElementById('calStatus').textContent")), "la tarjeta 02 muestra la base y el estado");
+  ok(/Datos de la base base_para_datos\.mdb/.test(await P.ev("document.getElementById('calStatus').textContent")), "la tarjeta 03 muestra la base y el estado");
   if (REF_DATOS) ok(d1 && mismosDatos(REF_DATOS, d1), "contenido IDÉNTICO al datos_calibracion.json de extract_ranges.ps1 sobre la misma base");
   ok(hash(baseDatos) === hashDatos, "la base leída no cambió");
   if (process.env.E2E_BASE_VIEJA) {
@@ -376,7 +376,7 @@ async function main() {
   await O.esperar("!!CAL_OVERRIDE && CAL_OVERRIDE.origen==='nube'", 30000, "sincronización en otro navegador");
   ok(await O.ev("CAL_OVERRIDE.base.ultimoId") === idTras7, "aplicó los datos de la nube (n.º " + idTras7 + ")");
   ok(await O.ev("repLookup('LT-R161').by") === "PRUEBA E2E", "el reporte por defecto de LT-R161 ya viene actualizado en el otro navegador");
-  ok(/recibidos de la nube/.test(await O.ev("document.getElementById('calStatus').textContent")), "la tarjeta 02 indica que vienen de la nube");
+  ok(/recibidos de la nube/.test(await O.ev("document.getElementById('calStatus').textContent")), "la tarjeta 03 indica que vienen de la nube");
 
   ok(errores.length === 0, "sin errores de JavaScript en consola" + (errores.length ? ": " + errores.join(" | ") : ""));
   fs.writeFileSync(path.join(WORK, "resultado_browser.json"), JSON.stringify({ mdb: mdbOut.file, json: jsonOut.file, base: ed1 }));

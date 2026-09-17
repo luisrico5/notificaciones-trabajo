@@ -12,7 +12,7 @@
 #   powershell -ExecutionPolicy Bypass -File src\extract_ranges.ps1 -Password "<clave>"
 #   powershell -ExecutionPolicy Bypass -File build.ps1
 #
-# Para actualizar en el futuro: apunta -Mdb a la base nueva, ejecuta y adjunta el .json en la tarjeta 02
+# Para actualizar en el futuro: apunta -Mdb a la base nueva, ejecuta y adjunta el .json en la tarjeta 03
 # ("Base de calibración") — o reconstruye para dejarlo incrustado. Toda la lógica se conserva; solo
 # cambian los datos. Nunca se inventa: el TAG sin datos simplemente no se incluye.
 
