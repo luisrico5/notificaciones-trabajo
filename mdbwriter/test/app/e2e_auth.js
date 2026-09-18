@@ -74,13 +74,24 @@ function pickRec(api){ return Object.keys(api.TAG_REPORT).map(k=>api.TAG_REPORT[
     const G=st.groups[0]; B.api.regenPoints(G,7); G.rows[0].found=G.rows[0].outNom+0.01; G.rows[3].left=G.rows[3].outNom-0.02;
     G.range.oHi=G.range.oHi*1.1; B.api.regenPoints(G,7); G.rows[6].found=G.rows[6].outNom+0.03;
     const pay1=JSON.stringify(B.api.repGrabarPayload(st));
-    B.api.repState=st; const html1=B.api.repBuildHtml().replace(/<tr><td class="lbl">Fecha de finalización<\/td><td>[^<]*<\/td><\/tr>/,"");
+    B.api.repState=st; const html1=B.api.repBuildHtml();
     const p=JSON.parse(JSON.stringify(B.api.misReportes.serializeCal(st)));
     ok(p.v===1 && p.rec && p.h && p.groups && !("meta" in p.groups[0]) && !("tol" in p.groups[0]),"payload v1 con rec/h/std/groups (sin meta ni tol)");
     const st2=B.api.misReportes.deserializeCal(p);
     eq(JSON.stringify(B.api.repGrabarPayload(st2)),pay1,"repGrabarPayload idéntico tras reabrir");
-    B.api.repState=st2; const html2=B.api.repBuildHtml().replace(/<tr><td class="lbl">Fecha de finalización<\/td><td>[^<]*<\/td><\/tr>/,"");
-    eq(html2,html1,"repBuildHtml idéntico tras reabrir (salvo hora de finalización)");
+    B.api.repState=st2; const html2=B.api.repBuildHtml();
+    eq(html2,html1,"repBuildHtml idéntico tras reabrir (incluida la fecha de finalización)");
+    // La "Fecha de finalización" del PDF es la del reporte (editable), NUNCA la fecha de hoy.
+    const filaFin=h=>{ const m=h.match(/<tr><td class="lbl">Fecha de finalización<\/td><td>([^<]*)<\/td><\/tr>/); return m?m[1]:""; };
+    eq(st.h.fdt,st.h.dt,"por defecto la fecha de finalización es la de calibración");
+    eq(filaFin(html1),st.h.dt,"el reporte imprime esa fecha");
+    st.h.dt="05/03/2026"; st.h.fdt="07/03/2026"; B.api.repState=st;
+    eq(filaFin(B.api.repBuildHtml()),"07/03/2026","si se edita, el reporte imprime la editada");
+    const pViejo=JSON.parse(JSON.stringify(B.api.misReportes.serializeCal(st)));
+    delete pViejo.h.fdt; pViejo.h.dt="12/01/2026";                    // reporte guardado antes del cambio
+    const stV=B.api.misReportes.deserializeCal(pViejo); B.api.repState=stV;
+    eq(stV.h.fdt,"12/01/2026","un reporte viejo sin ese dato toma su fecha de calibración");
+    eq(filaFin(B.api.repBuildHtml()),"12/01/2026","y el PDF la imprime (no la de hoy)");
     eq(st2.h.nt,"Nota editada a mano.","nota editada conservada"); eq(st2.std.length,st.std.length,"patrones añadidos conservados");
     const G2=st2.groups[0]; let same=true;
     [0,0.25,0.5,0.75,1].forEach(f=>{ const o=G.range.oLo+(G.range.oHi-G.range.oLo)*f, span=Math.abs(G.range.oHi-G.range.oLo); const a=G.tol(o,span), b=G2.tol(o,span); if(!((isNaN(a)&&isNaN(b))||Math.abs(a-b)<1e-12)) same=false; });

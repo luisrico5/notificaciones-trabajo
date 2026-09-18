@@ -163,7 +163,11 @@ está en medio y el archivo se regenera).
   y patrones del último reporte con detalle (`std=[code,name,mf,model,serial,lastCal,nextCal]`). Los defaults
   de temp/humedad/tipo/certificado/técnico salen del reporte más reciente (`CALIBRAT`); la nota por defecto usa
   el P-SG del mapeo (`procForTag`→`detectKey`). **Lo único que se ingresa a mano son los valores de calibración**
-  (Enc. como / Dejado como por punto); todo lo demás es editable pero prellenado. Cálculo automático:
+  (Enc. como / Dejado como por punto); todo lo demás es editable pero prellenado. **"Fecha de finalización"
+  (`h.fdt`, campo editable de `REP_FIELDS`)**: es la del reporte, NUNCA la de hoy (antes se imprimía
+  `nowStamp()`, un bug). Arranca igual a la fecha de calibración (`h.dt`) — también cuando `buildRepBatch`
+  toma la fecha de la orden — y la **sigue mientras no se edite aparte** (el listener de `dt` la arrastra solo
+  si `fdt===dt`, sin flags, así sobrevive a guardar/reabrir); editada, manda lo editado. Cálculo automático:
   **salida nominal** viene de la base; **% de desviación** = `desvPct` (para *Pct of Range* la base es la
   **salida máxima** del grupo, así el límite coincide con `RangeAccuracyPct×salidaMax`; para *Pct of Reading*
   es respecto al nominal); **Aprobado/Fallado** = `dentro` (usa los `LowLimit/HighLimit` de la base, que están
@@ -342,8 +346,9 @@ repo**), `AUTH_KEY="noti_auth_v1"`, `PENDING_KEY="noti_pending_v1"`, `CURRENT_US
   respeta `_autoTec`).
 - **`misReportes`**: `serializeCal(st)` = `{v:1,tag,rec (snapshot COMPLETO),h,std,groups:[{gn,range,rows}]}`
   — sin `meta` (=`rec.g[i]`) ni `tol` (función); `deserializeCal(p)` = `repBuildState(p.rec)` (re-deriva `tol`
-  con `deriveTol(pts)`) + sobreescribir `h/std/range/rows` (`null`→`NaN`). Así `repGrabarPayload` y
-  `repBuildHtml` (salvo "Fecha de finalización") son idénticos al reabrir. `serializeNoti(row)` =
+  con `deriveTol(pts)`) + sobreescribir `h/std/range/rows` (`null`→`NaN`; si el payload no trae `h.fdt` —
+  guardado antes de que existiera— se toma `h.dt`). Así `repGrabarPayload` y
+  `repBuildHtml` son idénticos al reabrir, **incluida la fecha de finalización**. `serializeNoti(row)` =
   `{v:1,row (sin _cloud*/_qid),txt:genText(row),filename:fileNameOf(row)}`; `deserializeNoti` = copia +
   `id=++uid` + `recompAuto`. Filas de `reportes`: `{kind:"calibracion"|"notificacion",tag,ot,titulo,payload}`;
   `guardar()` hace **upsert por `(user_id,kind,tag,ot)`** (re-guardar actualiza, no duplica; efecto

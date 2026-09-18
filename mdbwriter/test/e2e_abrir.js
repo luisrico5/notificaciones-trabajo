@@ -198,6 +198,34 @@ async function main() {
   await ev("document.getElementById('misSelAll').click(); true");
   ok(await ev("document.getElementById('misAbrirSel').disabled===true"), "y vuelve a desmarcarlos");
 
+  console.log("\n[7] Fecha de finalización del reporte (no la de hoy) y editable");
+  await ev("switchTab('reporte'); repSelectShow(0); true");
+  await esperar("!!document.querySelector('#repForm [data-h=\"fdt\"]')", 10000, "campo de fecha de finalización");
+  const hoy = await ev("todayDMY()");
+  ok(await ev(`document.querySelector('#repForm [data-h="fdt"]').value===document.querySelector('#repForm [data-h="dt"]').value`), "arranca igual a la fecha de calibración");
+  const finPdf = async () => await ev(`(function(){ var m=repBuildHtml().match(/Fecha de finalización<\\/td><td>([^<]*)</); return m?m[1]:""; })()`);
+  ok(await finPdf() === await ev(`repState.h.dt`), "el reporte imprime la fecha del reporte, no otra");
+  // Cambiar la fecha de calibración arrastra la de finalización mientras no se toque.
+  await ev(`var el=document.querySelector('#repForm [data-h="dt"]'); el.value='05/03/2026'; el.dispatchEvent(new Event('input',{bubbles:true})); true`);
+  ok(await ev(`repState.h.fdt==='05/03/2026' && document.querySelector('#repForm [data-h="fdt"]').value==='05/03/2026'`), "al cambiar la fecha de calibración, la de finalización la sigue");
+  // Editarla a mano y volver a cambiar la de calibración: ya no la pisa.
+  await ev(`var el=document.querySelector('#repForm [data-h="fdt"]'); el.value='09/03/2026'; el.dispatchEvent(new Event('input',{bubbles:true})); true`);
+  await ev(`var el=document.querySelector('#repForm [data-h="dt"]'); el.value='06/03/2026'; el.dispatchEvent(new Event('input',{bubbles:true})); true`);
+  ok(await ev(`repState.h.fdt==='09/03/2026'`), "una vez editada, la de finalización se respeta");
+  const f7 = await finPdf();
+  ok(f7 === "09/03/2026" && f7.indexOf(hoy) < 0, "el PDF imprime la editada (" + f7 + "), no la de hoy (" + hoy + ")");
+  // Sobrevive a guardar en la cuenta y reabrir.
+  await ev("document.getElementById('repGuardarNube').click(); true");
+  await esperar("/guardado en tu cuenta/.test(document.getElementById('repNubeMsg').textContent)", 30000, "guardado");
+  await ev("document.getElementById('repLimpiar').click(); true");
+  await esperar("REP_BATCH.length===0", 10000, "lote vaciado");
+  await ev("switchTab('mis'); true");
+  await esperar("/PT-U7122/.test(document.getElementById('misList').textContent)", 20000, "lista");
+  await ev(`(function(){ var tr=Array.from(document.querySelectorAll('#misList tbody tr')).find(function(t){ return /PT-U7122/.test(t.textContent) && /Calibración/.test(t.textContent); }); tr.querySelector('[data-open]').click(); })(); true`);
+  await esperar("REP_BATCH.length===1 && !!repState", 30000, "reabierto");
+  ok(await ev(`repState.h.fdt==='09/03/2026' && repState.h.dt==='06/03/2026'`), "al reabrirlo conserva ambas fechas");
+  ok(await finPdf() === "09/03/2026", "y el PDF sigue imprimiendo la suya");
+
   ok(errores.length === 0, "sin errores de JavaScript en consola" + (errores.length ? ": " + errores.join(" | ") : ""));
   console.log("\nRESULTADO ABRIR NAVEGADOR: " + pass + " OK, " + fail + " FAIL");
   ws.close(); chrome.kill(); server.close(); mock.close();

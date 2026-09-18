@@ -78,7 +78,9 @@ DPCTrack2, a partir de un TAG.
    departamento, empresa, tipo de calibración, certificado, temperatura, humedad, técnico, las
    **especificaciones** (precisión, puntos nominales de entrada/salida y sus unidades) y los **patrones
    utilizados** en el último reporte (con fabricante, modelo, serie y fechas de calibración). Todos esos
-   campos quedan **editables**.
+   campos quedan **editables**. La **Fecha de finalización** que sale en el PDF es la **del reporte**: parte
+   de la fecha de calibración (si cambias esa, la sigue) y puedes escribirle otra, útil al reabrir reportes
+   viejos.
 3. **Lo único que ingresas a mano son los valores de calibración**: por cada punto, **Enc. como** (as-found)
    y **Dejado como** (as-left). Vienen prellenados con el valor nominal (calibración ideal); cambia solo los
    que difieran.

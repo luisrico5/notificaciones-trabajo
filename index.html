@@ -460,7 +460,7 @@
   </section>
 </div>
 
-<footer>Funciona en tu navegador · Los reportes se guardan en tu cuenta (Supabase) · Sin conexión puedes generar .txt/PDF; guardar requiere internet · <span title="Fecha de compilación. Si no coincide con la última, recarga con Ctrl+Shift+R.">versión 2026-09-17 13:41</span></footer>
+<footer>Funciona en tu navegador · Los reportes se guardan en tu cuenta (Supabase) · Sin conexión puedes generar .txt/PDF; guardar requiere internet · <span title="Fecha de compilación. Si no coincide con la última, recarga con Ctrl+Shift+R.">versión 2026-09-18 06:35</span></footer>
 </div>
 <div id="reportPrint" aria-hidden="true"></div>
 <div id="authGate">
@@ -6319,6 +6319,7 @@ function pnum(v){ if(v==null) return NaN; return parseFloat(String(v).trim().rep
 function fmtNum(x){ if(x===""||x==null||!isFinite(x)) return ""; var s=(Math.round(x*10000)/10000).toString(); if(s.indexOf(".")<0) s+=".0"; return s; }
 function fmtPct(x){ return (isFinite(x)?x:0).toFixed(2)+"%"; }
 function todayDMY(){ var d=new Date(), z=function(n){return(n<10?"0":"")+n;}; return z(d.getDate())+"/"+z(d.getMonth()+1)+"/"+d.getFullYear(); }
+/* Marca de tiempo actual (no se usa en el reporte: su "Fecha de finalización" es h.fdt, editable). */
 function nowStamp(){ var d=new Date(), z=function(n){return(n<10?"0":"")+n;}; return todayDMY()+" "+z(d.getHours())+":"+z(d.getMinutes())+":"+z(d.getSeconds()); }
 /* Procedimiento P-SG asociado (para la nota por defecto), reutilizando el mapeo. */
 function procForTag(tag,name){ try{ var k=detectKey(tag,name||""); var e=k?MAP[k]:null; if(e&&e.proc) return e.proc; }catch(e){} return ""; }
@@ -6410,7 +6411,7 @@ function buildRepBatch(){
     if(r.ot!=null && String(r.ot).trim()!=="") st.h.ce=String(r.ot).trim();
     // Fecha "Calibrado" = fecha de la orden pegada/adjuntada de ese TAG (si es una fecha válida;
     // si no, queda la de hoy que puso repBuildState). Editable después.
-    var fo=parseFecha(r.fecha); if(fo) st.h.dt=fo;
+    var fo=parseFecha(r.fecha); if(fo){ st.h.dt=fo; st.h.fdt=fo; }   // finalización = misma fecha (editable)
     seen[k]=1; REP_BATCH.push(st);
   });
 }
@@ -6443,7 +6444,9 @@ function repBuildState(rec){
     mf:rec.mf||"", mo:rec.mo||"", sr:rec.sr||"", st:rec.st||"", cl:rec.cl||"",
     lo:rec.lo||"", bu:rec.bu||"", de:rec.de||"", eq:rec.eq||"",
     ct:rec.ct||"Programada", ce:rec.ce||"", tp:rec.tp||"", hu:rec.hu||"",
-    by:tecnicoNombre()||rec.by||"", fin:tecnicoNombre()||"User", dt:todayDMY(),
+    // fdt = fecha de finalización del reporte. Arranca igual a la fecha de calibración (dt) y la sigue
+    // mientras no se edite aparte; es editable (los reportes viejos conservan la suya).
+    by:tecnicoNombre()||rec.by||"", fin:tecnicoNombre()||"User", dt:todayDMY(), fdt:todayDMY(),
     // Nota: si el último reporte de la base trae nota (los WT traen la tabla de celdas de carga completa),
     // se usa esa; si no, se genera una por defecto con el procedimiento del mapeo. Siempre editable.
     nt: (rec.nt && String(rec.nt).trim()) ? String(rec.nt)
@@ -6499,7 +6502,7 @@ var REP_FIELDS=[
   ["Clasificación","cl"],["Ubicación","lo"],["Edificio","bu"],["Departamento","de"],
   ["ID de equipo","eq"],["Tipo de calibración","ct"],["Nr. de certificado","ce"],
   ["Temp","tp"],["Humedad","hu"],["Fecha de calibración","dt"],
-  ["Quién realizó la calibración","by"],["Finalizado por","fin"]
+  ["Quién realizó la calibración","by"],["Finalizado por","fin"],["Fecha de finalización","fdt"]
 ];
 function repRenderForm(){
   var f=document.getElementById("repForm"), act=document.getElementById("repActions");
@@ -6681,7 +6684,7 @@ function repBuildHtml(){
     '<tr><td class="lbl">Resultado de calibración</td><td>'+esc(h.res)+'</td></tr>'+
     '<tr><td class="lbl">Quién realizó la calibración</td><td>'+esc(h.by)+'</td></tr>'+
     '<tr><td class="lbl">Finalizado por</td><td>'+esc(h.fin)+'</td></tr>'+
-    '<tr><td class="lbl">Fecha de finalización</td><td>'+esc(nowStamp())+'</td></tr></table>';
+    '<tr><td class="lbl">Fecha de finalización</td><td>'+esc(h.fdt||h.dt||"")+'</td></tr></table>';
   return html;
 }
 /* "Generar reporte (PDF)": abre la ventana de impresión del navegador (Guardar como PDF, vectorial). */
@@ -6810,7 +6813,17 @@ function repGrabar(){
   f.addEventListener("change", function(){ REP_BATCH_EDITADO=true; if(repState) repState._tocado=true; }, true);
   f.addEventListener("input", function(e){
     var el=e.target; if(el.tagName!=="INPUT" && el.tagName!=="TEXTAREA") return;
-    if(el.hasAttribute("data-h")){ repState.h[el.getAttribute("data-h")]=el.value; return; }
+    if(el.hasAttribute("data-h")){
+      var hk=el.getAttribute("data-h");
+      if(hk==="dt"){
+        // La fecha de finalización sigue a la de calibración mientras no se haya editado aparte.
+        var sinc=(String(repState.h.fdt||"")===String(repState.h.dt||""));
+        repState.h.dt=el.value;
+        if(sinc){ repState.h.fdt=el.value; var fi=document.querySelector('#repForm [data-h="fdt"]'); if(fi) fi.value=el.value; }
+        return;
+      }
+      repState.h[hk]=el.value; return;
+    }
     if(el.hasAttribute("data-k")){
       var gi=+el.getAttribute("data-g"), pi=+el.getAttribute("data-p"), k=el.getAttribute("data-k");
       var G=repState.groups[gi], r=G.rows[pi];
@@ -7675,6 +7688,8 @@ var misReportes=(function(){
   function deserializeCal(p){
     var st=repBuildState(p.rec);
     Object.keys(p.h||{}).forEach(function(k){ st.h[k]=p.h[k]; });
+    // Reportes guardados antes de que existiera la fecha de finalización: la toman de su fecha de calibración.
+    if(!p.h || p.h.fdt===undefined) st.h.fdt=st.h.dt;
     st.std=(p.std||[]).map(function(x){ return x.slice(); });
     (p.groups||[]).forEach(function(sg,i){
       var G=st.groups[i]; if(!G) return;
