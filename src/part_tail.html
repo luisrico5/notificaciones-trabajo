@@ -3355,10 +3355,15 @@ function repGrabarPayload(st){
   var grupos=st.groups.map(function(G){
     var ins=G.rows.map(function(r){return pnum(r.inNom);}).filter(isFinite);
     var outs=G.rows.map(function(r){return pnum(r.outNom);}).filter(isFinite);
-    return { gn:G.meta.gn,
+    var m=G.meta||{};
+    return { gn:m.gn,
       // rango del grupo = extremos de los puntos actuales (refleja entrada editada y mín/máx de salida)
       inLow:ins.length?Math.min.apply(null,ins):null, inHigh:ins.length?Math.max.apply(null,ins):null,
       outLow:outs.length?Math.min.apply(null,outs):null, outHigh:outs.length?Math.max.apply(null,outs):null,
+      // Datos del grupo (unidades, precisión, nombre): los necesita el grabado cuando el instrumento
+      // todavía no tiene especificación en la base y hay que crearla.
+      nombre:m.na||"", unidadIn:m.it||"", unidadOut:m.ot||"", precision:m.sa||"",
+      pctRango:(m.ra==null?null:pnum(m.ra)), pctLectura:(m.rd==null?null:pnum(m.rd)), masMenos:(m.pm==null?null:pnum(m.pm)),
       puntos:G.rows.map(function(r,i){
         return { pos:i+1, inNom:r.inNom, outNom:r.outNom, low:r.lo, high:r.hi, found:r.found, left:r.left };
       }) };
@@ -3972,7 +3977,7 @@ var dbGrabar=(function(){
       $("dbLog").textContent=log; $("dbLog").hidden=false;
       if(!r.insertados){
         terminar(); prepP=null;
-        estado("No se grabó ninguna calibración: todos los instrumentos se omitieron (sin calibración previa en esa base para usar de plantilla). No hace falta descargar la base y el respaldo de la nube no se tocó.","warn");
+        estado("No se grabó ninguna calibración: todos los instrumentos se omitieron (no están en el maestro de instrumentos de esa base). No hace falta descargar la base y el respaldo de la nube no se tocó.","warn");
         return;
       }
       salida={ blob:new Blob(out.partes,{type:"application/octet-stream"}), nombre:f.name }; baseDescargada=false;

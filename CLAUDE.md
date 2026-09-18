@@ -172,8 +172,8 @@ está en medio y el archivo se regenera).
   grupo (`data-guin`/`data-guout`): ahí `meta` es un objeto nuevo por reporte, así que editarlo no muta
   `TAG_REPORT` (los grupos con spec comparten `rec.g`, por eso en ellos no se editan). `serializeCal` guarda
   `it`/`ot` por grupo y `deserializeCal` los aplica si `sinSpec`. La cabecera (fabricante, modelo, serie,
-  ubicación…) sí sale de la base. Ojo: grabar en la base exige una calibración previa como plantilla, así que
-  estos equipos se **omiten** al grabar (con aviso del script).
+  ubicación…) sí sale de la base. **Sí se pueden grabar** aunque nunca hayan tenido calibración (ver
+  *Primera calibración* en el apartado del grabado).
   **"Fecha de finalización"
   (`h.fdt`, campo editable de `REP_FIELDS`)**: es la del reporte, NUNCA la de hoy (antes se imprimía
   `nowStamp()`, un bug). Arranca igual a la fecha de calibración (`h.dt`) — también cuando `buildRepBatch`
@@ -282,8 +282,20 @@ está en medio y el archivo se regenera).
   Acepta **uno o varios** instrumentos
   (`$d.calibraciones`): itera con IDs incrementales, todo en **una transacción** (atómico; `Q` lleva la
   transacción en cada SELECT; `Exec` corre los UPDATE/DELETE parametrizados de la spec y el contador `IDs`);
-  omite (con aviso) los
-  que no tengan calibración previa de plantilla. Fija el
+  **Primera calibración de un instrumento** (sin calibración previa que sirva de plantilla): ya NO se omite.
+  Requisito: que el TAG exista en el maestro `INSTRMNT` (si no, se omite con aviso). Se usa como **molde** la
+  calibración más reciente de CUALQUIER instrumento (solo para que todas las columnas lleven el formato de
+  DPCTrack) y encima van: los datos del equipo leídos de `INSTRMNT` (empresa, nombre, fabricante, modelo,
+  serie, ubicación, edificio, depto, estado, clasificación, P&ID, SOP, frecuencia, fechas, contadores), los
+  del reporte, y a cero/vacío todo lo que era del otro instrumento (`PlannedMaintID`, `MaintRequestID`,
+  aprobación, `EQUIPMENTNAME`, `REASON`, límites de control). `CalGroups` y `CALDET` se construyen **desde los
+  grupos del JSON** (no desde los del molde), con sus unidades y precisión. Si además falta la
+  **especificación**, `Update-Spec` la **crea**: inserta `InstSpecGroup` y las N filas de `INSTSPEC` a partir
+  de la spec del instrumento del molde (grupo y posición más bajos — criterio numérico, para que el script y
+  el port elijan la misma fila) con los datos del reporte. Por eso `repGrabarPayload` manda por grupo
+  `nombre/unidadIn/unidadOut/precision/pctRango/pctLectura/masMenos`. En el port, `molde[0]` se actualiza con
+  cada calibración insertada (el script relee la tabla en cada instrumento del lote) y `Resultado.specGrpDelta`
+  cuenta los `InstSpecGroup` creados para que el Verificador cuadre los conteos. Fija el
   `OleDbType` de cada parámetro desde el esquema (evita "type mismatch" con los NULL). La **contraseña de la
   base NO se toca** (se abre con ella y queda igual). Uso:
   `powershell -File src\grabar_reporte.ps1 -Json <archivo> -Password "<clave>"`. Verificado contra la base

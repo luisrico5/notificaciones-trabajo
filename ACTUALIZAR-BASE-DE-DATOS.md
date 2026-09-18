@@ -176,7 +176,8 @@ Dashboard (pestaña Reporte)                     PowerShell                     
 | Mensaje | Causa / solución |
 |---|---|
 | `No se pudo abrir la base editable (revisa -Password)` | Contraseña incorrecta o proveedor ACE ausente. Verifica la clave y que Access/ACE esté instalado. |
-| `OMITIDO <tag> (sin calibración previa de plantilla)` | Ese instrumento no tiene historial en la base; no se puede armar la plantilla. Normal para equipos nuevos. |
+| `OMITIDO <tag> (no esta en el maestro de instrumentos de la base)` | Ese TAG no existe en la base (tabla de instrumentos). Hay que darlo de alta en DPCTrack antes de grabarle calibraciones. |
+| `PRIMERA calibracion, molde=<id> de otro instrumento` | El equipo existe pero nunca se le habia grabado una calibracion: se crea desde cero (y su especificacion, si falta) usando otra calibracion solo como molde de formato. |
 | `type mismatch` / error al insertar | Reintenta; el script fija el tipo de cada columna desde el esquema. Si persiste, revisa que el JSON no venga corrupto. |
 | En **DPCTrack**: `clave duplicada` / `violación de la llave` al crear/guardar una calibración | El **contador interno** de DPCTrack (tabla `IDs`, `LastID`) quedó por debajo del `MAX` real y DPCTrack intentó reusar un `CalibrationID`/`NoteID` ya insertado. El script (a partir de esta versión) **sube ese contador** al grabar, así que no debería volver a pasar. Para reparar una base afectada: `UPDATE IDs SET LastID=(SELECT MAX(CalibrationID) FROM CALIBRAT) WHERE TABLENAME='CALIBRAT'` y lo mismo con `PCNOTES`/`MAX(NoteID)` sobre la base **editable**. |
 

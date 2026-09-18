@@ -53,7 +53,11 @@ function ParseDate($s){
   }
   try { return [datetime]::Parse(([string]$s).Trim(),$inv) } catch { return $null }
 }
-function Dbl($v){ if($null -eq $v){return $null}; try { return [double](([string]$v).Replace(",",".")) } catch { return $null } }
+function Dbl($v){ if($null -eq $v -or $v -is [DBNull]){return $null}; try { return [double](([string]$v).Replace(",",".")) } catch { return $null } }
+# Lecturas tolerantes a celdas vacias (DBNull) del maestro de instrumentos.
+function Txt($v){ if($null -eq $v -or $v -is [DBNull]){ return "" }; return [string]$v }
+function Int0($v){ if($null -eq $v -or $v -is [DBNull]){ return 0 }; try { return [int]$v } catch { return 0 } }
+function Bool0($v){ if($null -eq $v -or $v -is [DBNull]){ return $false }; try { return [bool]$v } catch { return $false } }
 
 # Mapea el tipo .NET de una columna a OleDbType (para fijar el tipo del parámetro, incl. valores NULL).
 function OleType($t){
@@ -99,15 +103,15 @@ function Row-Hash($schemaDt,$row,$ov){
 #   2) INSTSPEC: se borran las filas de puntos viejas y se insertan N nuevas (Position, InputSignal,
 #      OutputSignal, LowLimit, HighLimit del reporte), copiando el resto de columnas de una fila plantilla
 #      del mismo grupo (COMPANYNAME, tipos de señal, precisión, resoluciones, etc.).
-# Solo actúa sobre grupos que YA existen en la spec (instrumentos reales); si falta, avisa y omite ese grupo.
-function Update-Spec($conn,$tx,$tag,$d){
+# Si el instrumento NO tiene especificacion del grupo, se CREA: la fila plantilla sale de otro instrumento
+# (asi todas las columnas llevan valores con el formato que usa DPCTrack) y encima se ponen los datos del
+# reporte (rangos, puntos, limites, unidades y precision, que el dashboard manda en el JSON).
+function Update-Spec($conn,$tx,$tag,$d,$comp,$moldeTag){
+  $mesc=([string]$moldeTag).Replace("'","''")
   $O=[System.Data.OleDb.OleDbType]
   $tesc=$tag.Replace("'","''")
   foreach($g in $d.grupos){
     $gn=[int]$g.gn
-    $dtSpec = Q $conn "SELECT * FROM INSTSPEC WHERE INSTRUMENTCODE='$tesc' AND GroupNumber=$gn" $tx
-    if($dtSpec.Rows.Count -eq 0){ Write-Host "    (spec: sin INSTSPEC para grupo $gn de $tag; se omite la spec de ese grupo)"; continue }
-    $tpl=$dtSpec.Rows[0]
     $pts=@($g.puntos); $ndiv=$pts.Count
     if($ndiv -lt 1){ continue }
     # Rangos: del JSON; si no vienen, extremos de los puntos.
@@ -115,20 +119,55 @@ function Update-Spec($conn,$tx,$tag,$d){
     $iHi=Dbl $g.inHigh; if($null -eq $iHi){ $iHi=Dbl $pts[$ndiv-1].inNom }
     $oLo=Dbl $g.outLow; if($null -eq $oLo){ $oLo=Dbl $pts[0].outNom }
     $oHi=Dbl $g.outHigh;if($null -eq $oHi){ $oHi=Dbl $pts[$ndiv-1].outNom }
-    # 1) InstSpecGroup (grupo a nivel de spec): Divisions + rangos. Lo demás (precisión, IOCORRELATION…) queda igual.
-    [void](Exec $conn $tx "UPDATE InstSpecGroup SET Divisions=?, InputLowRange=?, InputHighRange=?, OutputLowRange=?, OutputHighRange=? WHERE INSTRUMENTCODE=? AND GroupNumber=?" @(
-      @{t=$O::Integer;v=$ndiv}, @{t=$O::Double;v=$iLo}, @{t=$O::Double;v=$iHi}, @{t=$O::Double;v=$oLo}, @{t=$O::Double;v=$oHi},
-      @{t=$O::VarWChar;v=$tag}, @{t=$O::Integer;v=$gn} ))
+    # Datos del grupo que manda el dashboard (solo se usan al CREAR la spec; si ya existe, no se tocan).
+    $unIn=[string]$g.unidadIn; $unOut=[string]$g.unidadOut; $prec=[string]$g.precision; $gname=[string]$g.nombre
+    $ra=Dbl $g.pctRango; $rd=Dbl $g.pctLectura; $pm=Dbl $g.masMenos
+
+    $dtSpec = Q $conn "SELECT * FROM INSTSPEC WHERE INSTRUMENTCODE='$tesc' AND GroupNumber=$gn" $tx
+    $crear = ($dtSpec.Rows.Count -eq 0)
+    if($crear){
+      # Molde: la spec del instrumento del que salio la calibracion molde (grupo y posicion mas bajos).
+      $dtSpec = Q $conn "SELECT TOP 1 * FROM INSTSPEC WHERE INSTRUMENTCODE='$mesc' ORDER BY GroupNumber, Position" $tx
+      if($dtSpec.Rows.Count -eq 0){ Write-Host "    (spec: la base no tiene ninguna INSTSPEC de referencia; se omite el grupo $gn)"; continue }
+    }
+    $tpl=$dtSpec.Rows[0]
+    # 1) InstSpecGroup (grupo a nivel de spec): Divisions + rangos. Si no existe, se crea con los datos del reporte.
+    $dtG = Q $conn "SELECT * FROM InstSpecGroup WHERE INSTRUMENTCODE='$tesc' AND GroupNumber=$gn" $tx
+    if($dtG.Rows.Count -eq 0){
+      $dtGtpl = Q $conn "SELECT TOP 1 * FROM InstSpecGroup WHERE INSTRUMENTCODE='$mesc' ORDER BY GroupNumber" $tx
+      if($dtGtpl.Rows.Count -eq 0){ Write-Host "    (spec: la base no tiene ningun InstSpecGroup de referencia; se omite el grupo $gn)"; continue }
+      $ovG=@{ COMPANYNAME=$comp; INSTRUMENTCODE=$tag; GroupNumber=$gn; GROUPNAME=$gname;
+        Divisions=$ndiv; InputLowRange=$iLo; InputHighRange=$iHi; OutputLowRange=$oLo; OutputHighRange=$oHi;
+        INPUTSIGNALTYPE=$unIn; OUTPUTSIGNALTYPE=$unOut; STATEDACCURACY=$prec;
+        RangeAccuracyPct=$ra; ReadingAccuracyPct=$rd; PlusMinus=$pm;
+        UseControlLimits=$false; ControlPct=0; ControlPlusMinus=0; UseControlPlusMinus=$false }
+      Insert-Hash $conn $tx $dtGtpl "InstSpecGroup" (Row-Hash $dtGtpl $dtGtpl.Rows[0] $ovG)
+      Write-Host ("    spec CREADA: grupo $gn de $tag")
+    } else {
+      [void](Exec $conn $tx "UPDATE InstSpecGroup SET Divisions=?, InputLowRange=?, InputHighRange=?, OutputLowRange=?, OutputHighRange=? WHERE INSTRUMENTCODE=? AND GroupNumber=?" @(
+        @{t=$O::Integer;v=$ndiv}, @{t=$O::Double;v=$iLo}, @{t=$O::Double;v=$iHi}, @{t=$O::Double;v=$oLo}, @{t=$O::Double;v=$oHi},
+        @{t=$O::VarWChar;v=$tag}, @{t=$O::Integer;v=$gn} ))
+    }
     # 2) INSTSPEC (puntos de la spec): borrar los viejos e insertar los del reporte.
-    [void](Exec $conn $tx "DELETE FROM INSTSPEC WHERE INSTRUMENTCODE=? AND GroupNumber=?" @(
-      @{t=$O::VarWChar;v=$tag}, @{t=$O::Integer;v=$gn} ))
+    if(-not $crear){
+      [void](Exec $conn $tx "DELETE FROM INSTSPEC WHERE INSTRUMENTCODE=? AND GroupNumber=?" @(
+        @{t=$O::VarWChar;v=$tag}, @{t=$O::Integer;v=$gn} ))
+    }
     $pos=0
     foreach($pt in $pts){
       $pos++
-      $ov=@{ Position=$pos; InputSignal=(Dbl $pt.inNom); OutputSignal=(Dbl $pt.outNom); LowLimit=(Dbl $pt.low); HighLimit=(Dbl $pt.high) }
+      $lo=(Dbl $pt.low); $hi=(Dbl $pt.high)
+      $ov=@{ Position=$pos; InputSignal=(Dbl $pt.inNom); OutputSignal=(Dbl $pt.outNom); LowLimit=$lo; HighLimit=$hi }
+      if($crear){
+        # Fila de otro instrumento: hay que poner TODO lo que identifica al instrumento y a su grupo.
+        $ov['COMPANYNAME']=$comp; $ov['INSTRUMENTCODE']=$tag; $ov['GroupNumber']=$gn
+        $ov['INPUTSIGNALTYPE']=$unIn; $ov['OUTPUTSIGNALTYPE']=$unOut; $ov['STATEDACCURACY']=$prec
+        $ov['RangeAccuracyPct']=$ra; $ov['ReadingAccuracyPct']=$rd; $ov['PlusMinus']=$pm
+        $ov['LowControlLimit']=$lo; $ov['HighControlLimit']=$hi; $ov['DESCRIPTION']=''
+      }
       Insert-Hash $conn $tx $dtSpec "INSTSPEC" (Row-Hash $dtSpec $tpl $ov)
     }
-    Write-Host ("    spec actualizada: grupo $gn -> $ndiv puntos, entrada $iLo..$iHi, salida $oLo..$oHi")
+    Write-Host ("    spec " + $(if($crear){"creada"}else{"actualizada"}) + ": grupo $gn -> $ndiv puntos, entrada $iLo..$iHi, salida $oLo..$oHi")
   }
 }
 
@@ -138,8 +177,19 @@ function Update-Spec($conn,$tx,$tag,$d){
 function Process-Cal($conn,$tx,$d,$cid,$note,$now,$updateSpec){
   $tag = [string]$d.tag
   if ([string]::IsNullOrWhiteSpace($tag)) { Write-Host "  (omitido: calibración sin 'tag')"; return $false }
-  $tplRow = (Q $conn "SELECT TOP 1 CalibrationID FROM CALIBRAT WHERE ITEMTYPE='Instrument' AND ITEMCODE='$($tag.Replace("'","''"))' ORDER BY CalibrationDate DESC, CalibrationID DESC" $tx)
-  if ($tplRow.Rows.Count -eq 0) { Write-Host "  OMITIDO $tag (sin calibración previa de plantilla)"; return $false }
+  $tesc = $tag.Replace("'","''")
+  $tplRow = (Q $conn "SELECT TOP 1 CalibrationID FROM CALIBRAT WHERE ITEMTYPE='Instrument' AND ITEMCODE='$tesc' ORDER BY CalibrationDate DESC, CalibrationID DESC" $tx)
+  # PRIMERA calibracion del instrumento: no hay plantilla propia. Se usa la calibracion mas reciente de
+  # CUALQUIER instrumento solo como molde (todas las columnas con el formato de DPCTrack) y encima se ponen
+  # los datos del equipo (tabla INSTRMNT) y del reporte. Requisito: el equipo debe existir en el maestro.
+  $dtInst = $null
+  if ($tplRow.Rows.Count -eq 0) {
+    $dtInst = Q $conn "SELECT TOP 1 * FROM INSTRMNT WHERE INSTRUMENTCODE='$tesc'" $tx
+    if ($dtInst.Rows.Count -eq 0) { Write-Host "  OMITIDO $tag (no esta en el maestro de instrumentos de la base)"; return $false }
+    $tplRow = (Q $conn "SELECT TOP 1 CalibrationID FROM CALIBRAT WHERE ITEMTYPE='Instrument' ORDER BY CalibrationDate DESC, CalibrationID DESC" $tx)
+    if ($tplRow.Rows.Count -eq 0) { Write-Host "  OMITIDO $tag (la base no tiene ninguna calibracion de referencia)"; return $false }
+  }
+  $nuevo = ($null -ne $dtInst)
   $tpl = [int]$tplRow.Rows[0]['CalibrationID']
 
   $dtCal   = Q $conn "SELECT * FROM CALIBRAT  WHERE CalibrationID=$tpl" $tx
@@ -194,12 +244,51 @@ function Process-Cal($conn,$tx,$d,$cid,$note,$now,$updateSpec){
     Failed=$anyFail; AsFoundFailed=$anyFoundFail; IncompleteCal=$false; DateExported=[DBNull]::Value;
     ITEMNAME=([string]$d.nombre)
   }
+  if($nuevo){
+    # El molde es de OTRO instrumento: se ponen los datos de ESTE equipo (del maestro) y se limpia todo lo
+    # que pertenecia al otro (mantenimientos, aprobaciones, contadores, limites de control).
+    $I=$dtInst.Rows[0]
+    $ovCal['ITEMTYPE']='Instrument'; $ovCal['ITEMCODE']=$tag
+    $ovCal['COMPANYNAME']=Txt $I['COMPANYNAME']
+    if([string]::IsNullOrEmpty([string]$d.nombre)){ $ovCal['ITEMNAME']=Txt $I['INSTRUMENTNAME'] }
+    foreach($c in @('MANUFACTURER','MODELNUMBER','SERIALNUMBER','EQUIPMENTCODE','LOCATION','BUILDING','STATUS','DEPARTMENT','CLASSIFICATION','PNIDNUMBER','PNIDREVISIONNUMBER','SOPNUMBER')){
+      $ovCal[$c] = Txt $I[$c]
+    }
+    $ovCal['FREQUENCY']=Txt $I['CALIBRATIONFREQUENCY']
+    $ovCal['LastCalibrationDate']=$I['LastCalibrationDate']; $ovCal['NextCalibrationDate']=$I['NextCalibrationDate']
+    $ovCal['NewNextCalibrationDate']=[DBNull]::Value; $ovCal['DueDate']=[DBNull]::Value
+    $ovCal['SeparateCalReadings']=Bool0 $I['SeparateCalReadings']
+    $ovCal['CountScheduleEnabled']=Bool0 $I['CountScheduleEnabled']
+    $ovCal['ItemCountID']=Int0 $I['ItemCountID']; $ovCal['MaxCount']=Int0 $I['MaxCount']; $ovCal['LastReset']=Int0 $I['LastReset']
+    $ovCal['MeterValue']=0; $ovCal['COUNTTYPE']=''
+    $ovCal['EQUIPMENTNAME']=''; $ovCal['REASON']=''; $ovCal['SOPREVISIONNUMBER']=''
+    $ovCal['PlannedMaintID']=0; $ovCal['MaintRequestID']=0
+    $ovCal['ItemApprovalDate']=[DBNull]::Value; $ovCal['ITEMAPPROVEDBY']=''
+    $ovCal['UseControlLimits']=$false; $ovCal['ControlPct']=0
+    $ovCal['ManHours']=(Dbl $I['ExpectedManHours']); if($null -eq $ovCal['ManHours']){ $ovCal['ManHours']=0 }
+    $ovCal['AdjustToImprove']=$false
+  }
   Insert-Hash $conn $tx $dtCal "CALIBRAT" (Row-Hash $dtCal $dtCal.Rows[0] $ovCal)
-  # 3) CalGroups (Divisions = N.º de puntos; OutputLowRange/HighRange = mín/máx de salida editados)
-  foreach($row in $dtGrp.Rows){
-    $gn=[int]$row['GroupNumber']
+  # 3) CalGroups (Divisions = N.º de puntos; OutputLowRange/HighRange = mín/máx de salida editados).
+  #    Primera calibracion: los grupos salen del reporte (el molde ajeno solo aporta el formato de columnas).
+  $filasGrp = @($dtGrp.Rows)
+  if($nuevo){
+    $filasGrp = @()
+    foreach($g in $d.grupos){ $filasGrp += , $dtGrp.Rows[0] }
+  }
+  $ig = -1
+  foreach($row in $filasGrp){
+    $ig++
+    $gn = if($nuevo){ [int](@($d.grupos)[$ig].gn) } else { [int]$row['GroupNumber'] }
     $jg = $d.grupos | Where-Object { [int]$_.gn -eq $gn } | Select-Object -First 1
     $ovG = @{ CalibrationID=$cid; ASFOUNDSTATUS=$grpStatus; ASLEFTSTATUS=$grpStatus }
+    if($nuevo){
+      $ovG['GroupNumber']=$gn; $ovG['GROUPNAME']=[string]$jg.nombre
+      $ovG['INPUTSIGNALTYPE']=[string]$jg.unidadIn; $ovG['OUTPUTSIGNALTYPE']=[string]$jg.unidadOut
+      $ovG['STATEDACCURACY']=[string]$jg.precision
+      $ovG['RangeAccuracyPct']=(Dbl $jg.pctRango); $ovG['ReadingAccuracyPct']=(Dbl $jg.pctLectura); $ovG['PlusMinus']=(Dbl $jg.masMenos)
+      $ovG['UseControlLimits']=$false; $ovG['ControlPct']=0; $ovG['ControlPlusMinus']=0; $ovG['UseControlPlusMinus']=$false
+    }
     if($jg){
       $ovG['Divisions'] = @($jg.puntos).Count
       $iLo = Dbl $jg.inLow;  $iHi = Dbl $jg.inHigh
@@ -227,20 +316,30 @@ function Process-Cal($conn,$tx,$d,$cid,$note,$now,$updateSpec){
         $ov=@{ CalibrationID=$cid; GroupNumber=$gn; Position=$p; READINGTYPE=$rt;
           InputSignal=$inNom; OutputSignal=$outNom; NominalInputSignal=$inNom;
           LowLimit=$lo; HighLimit=$hi; Reading=$v; ReadingEntered=$true; RESULTSTATUS=$rs }
+        if($nuevo){
+          # Molde de otro instrumento: unidades, precision y limites de control tienen que ser los de este reporte.
+          $ov['INPUTSIGNALTYPE']=[string]$g.unidadIn; $ov['OUTPUTSIGNALTYPE']=[string]$g.unidadOut
+          $ov['STATEDACCURACY']=[string]$g.precision; $ov['DESCRIPTION']=''
+          $ov['RangeAccuracyPct']=(Dbl $g.pctRango); $ov['ReadingAccuracyPct']=(Dbl $g.pctLectura); $ov['PlusMinus']=(Dbl $g.masMenos)
+          $ov['LowControlLimit']=$lo; $ov['HighControlLimit']=$hi
+        }
         Insert-Hash $conn $tx $dtDet "CALDET" (Row-Hash $dtDet $tplRow $ov)
       }
     }
   }
   # 5) CALTEST
+  # La empresa sale del equipo cuando el molde es de otro instrumento.
   $comp=[string]$dtCal.Rows[0]['COMPANYNAME']
+  if($nuevo){ $comp=Txt $dtInst.Rows[0]['COMPANYNAME'] }
   foreach($p in $d.patrones){
     Insert-Hash $conn $tx $dtTst "CALTEST" @{ CalibrationID=$cid; COMPANYNAME=$comp; TESTINSTRUMENTCODE=([string]$p[0]);
       LastCalibrationDate=(ParseDate $p[5]); NextCalibrationDate=(ParseDate $p[6]); STATUS='En servicio';
       DateEntered=$now; ENTEREDBY='User'; CountScheduleEnabled=$false; ItemCountID=0; MaxCount=0; LastReset=0; MeterValue=0; CalTestID=0 }
   }
   # 6) Especificación (InstSpecGroup + INSTSPEC), para que DPCTrack arme el reporte con estos puntos/rangos.
-  if($updateSpec){ Update-Spec $conn $tx $tag $d }
-  Write-Host ("  OK $tag -> CalibrationID=$cid, NoteID=$note (plantilla=$tpl, grupos=" + (@($d.grupos).Count) + ", patrones=" + (@($d.patrones).Count) + ")")
+  if($updateSpec){ Update-Spec $conn $tx $tag $d $comp ([string]$dtCal.Rows[0]['ITEMCODE']) }
+  $molde = if($nuevo){ "PRIMERA calibracion, molde=$tpl de otro instrumento" } else { "plantilla=$tpl" }
+  Write-Host ("  OK $tag -> CalibrationID=$cid, NoteID=$note ($molde, grupos=" + (@($d.grupos).Count) + ", patrones=" + (@($d.patrones).Count) + ")")
   return $true
 }
 
@@ -280,7 +379,7 @@ try {
   [void](Exec $conn $tx "UPDATE IDs SET LastID=? WHERE TABLENAME='PCNOTES'  AND LastID<?" @(@{t=$O::Integer;v=($nextNote-1)}, @{t=$O::Integer;v=($nextNote-1)}))
   $tx.Commit()
   $conn.Close()
-  Write-Host ("LISTO. Insertados: $ins  |  omitidos (sin plantilla): $omit")
+  Write-Host ("LISTO. Insertados: $ins  |  omitidos: $omit")
   Write-Host "Abre 20260810_dpctrack2_editable.mdb en DPCTrack2 y genera los reportes."
 }
 catch {

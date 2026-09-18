@@ -7,6 +7,15 @@ memoria, la verifica y la ofrece para descargar. Nada se envía a un servidor.
 El JavaScript es el **port de `src/grabar_reporte.ps1`** (la lógica de `grabar.bat`) escrito en Java sobre
 [Jackcess](https://jackcess.sourceforge.io) 5.0.0 y compilado con [TeaVM](https://teavm.org) 0.15.0.
 
+## Primera calibración de un instrumento
+Si el instrumento **no tiene ninguna calibración previa**, ya no se omite: se crea desde cero. Se toma como
+**molde** la calibración más reciente de cualquier instrumento (solo para que todas las columnas lleven el
+formato que usa DPCTrack) y encima van los datos del equipo (tabla `INSTRMNT`) y los del reporte; lo que era
+del otro instrumento (mantenimientos, aprobación, contadores, límites de control) queda a cero. `CalGroups` y
+`CALDET` se construyen desde los grupos del JSON. Si al equipo también le falta la **especificación**, se crea
+(`InstSpecGroup` + `INSTSPEC`) con los datos del grupo que manda el dashboard (unidades, precisión, puntos y
+límites). Único requisito: que el TAG exista en el maestro `INSTRMNT`.
+
 ## Regla principal
 **La lógica de grabado vive en dos lugares y deben cambiar juntos:** `src/grabar_reporte.ps1` (grabar.bat) y
 `app/src/main/java/grabarmdb/GrabarMdb.java` (en línea). Tras cualquier cambio, regenerar y correr la prueba de
@@ -74,6 +83,8 @@ TeaVM → envolver como `function MDBW_FACTORY(){…; return exports;}` en `src/
 
 ## Pruebas
 Siempre sobre **copias** de la base editable, nunca la `_backup`. La clave va por variable de entorno, nunca en archivos.
+- `test/gen_json.js <salida.json> TAG…`: arma un JSON de grabado como el del botón (útil para TAGs sin
+  calibración previa). `test/revisar_tag.js <base.mdb> <TAG>`: muestra lo que quedó grabado de un TAG.
 - `test/run_case.sh <nombre> <base.mdb> <grabar.json> [salida]` (con `DPC_CLAVE`): graba el mismo JSON con
   `grabar_reporte.ps1` (ACE) y con el port en la JVM y compara el volcado de las 8 tablas + conteo de todas las tablas
   (`dump_fast.ps1`); luego exige que el JavaScript sea **idéntico byte a byte** a la JVM (`node_test.js`) y valida los

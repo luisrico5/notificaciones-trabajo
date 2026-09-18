@@ -202,9 +202,11 @@ async function main() {
   ok(await P.ev("!!document.getElementById('authGate').hidden || getComputedStyle(document.getElementById('authGate')).display==='none'"), "la app arrancó con la sesión cacheada");
   ok(await P.ev("typeof MDBW_FACTORY==='function' && typeof respaldoNube==='object'"), "index.html trae el escritor de la base y el módulo de respaldo");
   await P.ev("switchTab('reporte'); true");
-  const TAGS = ["LT-R161", "LT-U6924", "TIT-DR719", "PT-U7122"];
+  // LIT-B102 existe en la base pero no tiene especificación ni calibración: se graba creándolas desde cero.
+  const TAGS = ["LT-R161", "LT-U6924", "TIT-DR719", "PT-U7122", "LIT-B102"];
   for (const t of TAGS) { await P.ev(`document.getElementById('repTag').value=${JSON.stringify(t)}; document.getElementById('repBuscar').click(); true`); }
-  ok(await P.ev("REP_BATCH.length") === 4, "4 instrumentos agregados al lote con Buscar/agregar");
+  ok(await P.ev("REP_BATCH.length") === 5, "5 instrumentos agregados al lote con Buscar/agregar");
+  ok(await P.ev("REP_BATCH[4].sinSpec===true && REP_BATCH[4].groups[0].rows.length===5"), "LIT-B102 entra con la plantilla por defecto (sin especificación en la base)");
   await P.ev(`repSelectShow(1); var el=document.querySelector('#repForm input[data-gpts="0"]'); el.value="5"; el.dispatchEvent(new Event('change',{bubbles:true})); true`);
   ok(await P.ev("REP_BATCH[1].groups[0].rows.length") === 5, "LT-U6924 quedó con 5 puntos (editado en el formulario)");
   await P.ev(`repSelectShow(3); var el=document.querySelector('#repForm input[data-k="found"][data-g="0"][data-p="1"]'); el.value=String(REP_BATCH[3].groups[0].rows[1].hi+1); el.dispatchEvent(new Event('input',{bubbles:true})); true`);
@@ -233,7 +235,7 @@ async function main() {
   console.log("\n[2] Botón 'Grabar a la base de datos' abre el diálogo");
   await P.ev("document.getElementById('repGrabar').click(); true");
   ok(await P.ev("!document.getElementById('dbModal').hidden"), "se abre el diálogo");
-  ok(await P.ev("/Se grabarán 4 instrumento/.test(document.getElementById('dbResumen').textContent)"), "resumen: 4 instrumentos");
+  ok(await P.ev("/Se grabarán 5 instrumento/.test(document.getElementById('dbResumen').textContent)"), "resumen: 5 instrumentos");
   ok(await P.ev("document.getElementById('dbProcesar').disabled"), "'Grabar en la base' deshabilitado hasta elegir la base");
   await P.esperar("/Aún no hay respaldo/.test(document.getElementById('dbNubeInfo').textContent)", 10000, "info de la nube");
   ok(await P.ev("document.getElementById('dbNubeDescargar').disabled"), "sin respaldo en la nube: 'Descargar respaldo' deshabilitado");
@@ -259,7 +261,9 @@ async function main() {
   console.log("     estado: " + r4.estado);
   console.log("     log:\n" + (await P.ev("document.getElementById('dbLog').textContent")).split("\n").map(l => "       " + l).join("\n"));
   ok(/Respaldo de la base original guardado en la nube/.test(r4.estado) && /ok/.test(r4.clase), "grabó y guardó el respaldo (" + r4.seg + " s)");
-  ok(/4 calibraci/.test(r4.estado), "4 calibraciones grabadas");
+  ok(/5 calibraci/.test(r4.estado), "5 calibraciones grabadas (incluida la del equipo sin calibración previa)");
+  ok(await P.ev("/PRIMERA calibracion/.test(document.getElementById('dbLog').textContent) && /spec CREADA: grupo 1 de LIT-B102/.test(document.getElementById('dbLog').textContent)"), "LIT-B102: primera calibración y especificación creadas");
+  ok(await P.ev("!/OMITIDO/.test(document.getElementById('dbLog').textContent)"), "no se omitió ningún instrumento");
   ok(workers.length > nW, "el grabado corrió en un Web Worker");
   ok(Math.max(...r4.lat) < 1500, "la página siguió respondiendo (latencia máx " + Math.max(...r4.lat) + " ms)");
   ok(await P.ev("/Verificación: OK/.test(document.getElementById('dbLog').textContent)"), "autoverificación OK");
@@ -303,7 +307,8 @@ async function main() {
   await sleep(300);
   ok(P.dialogs.length === nDlg + 1 && /grabar\.bat/.test(P.dialogs[P.dialogs.length - 1]), "descargó " + jsonName + " y mostró el aviso");
   const pj = JSON.parse(fs.readFileSync(jsonOut.file, "utf8"));
-  ok(pj.calibraciones.length === 4 && pj.calibraciones[1].grupos[0].puntos.length === 5, "el JSON trae los 4 instrumentos y la edición de puntos");
+  ok(pj.calibraciones.length === 5 && pj.calibraciones[1].grupos[0].puntos.length === 5, "el JSON trae los 5 instrumentos y la edición de puntos");
+  ok(pj.calibraciones[4].grupos[0].unidadIn === "%" && pj.calibraciones[4].grupos[0].unidadOut === "mA" && pj.calibraciones[4].grupos[0].precision === "Pct of Range", "el JSON lleva unidades y precisión del grupo (necesarias para crear la especificación)");
   ok(fs.readFileSync(jsonOut.file, "utf8") === await P.ev("repGrabarJson().text"), "el JSON descargado es EXACTAMENTE el texto que recibió el grabado en línea");
 
   console.log("\n[7] Segundo grabado: el respaldo se REEMPLAZA (sigue habiendo uno)");

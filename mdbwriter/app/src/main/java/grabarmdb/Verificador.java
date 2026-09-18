@@ -47,6 +47,7 @@ public final class Verificador {
         delta.put("CALTEST", delta.get("CALTEST") + e.tstRows);
       }
       delta.put("INSTSPEC", res.specDelta);
+      delta.put("InstSpecGroup", res.specGrpDelta);
       for (String t : GrabarMdb.TABLAS) {
         Table tb = db.getTable(t);
         int esperado = res.conteosAntes.get(t) + delta.get(t);

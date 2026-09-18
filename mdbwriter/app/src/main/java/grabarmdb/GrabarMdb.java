@@ -57,6 +57,7 @@ public final class GrabarMdb {
     /** Filas de INSTSPEC esperadas al final por "tag|grupo" (en minúsculas) y variación neta de INSTSPEC. */
     final Map<String, Integer> specFinal = new LinkedHashMap<>();
     int specDelta;
+    int specGrpDelta;   // filas nuevas en InstSpecGroup (specs creadas desde cero)
     /** Resultado de Verificador.verificar (null si no se ejecutó). */
     public Map<String, Object> verificacion;
 
@@ -329,6 +330,7 @@ public final class GrabarMdb {
       Table ids = db.getTable("IDs");
       Table spec = db.getTable("INSTSPEC");
       Table specGrp = db.getTable("InstSpecGroup");
+      Table inst = db.getTable("INSTRMNT");   // maestro: datos del equipo para la PRIMERA calibración
       if (cal == null || grp == null || det == null || tst == null || notes == null || ids == null || spec == null || specGrp == null) {
         throw new IllegalStateException("La base no tiene las tablas de DPCTrack2 (CALIBRAT, CalGroups, CALDET, CALTEST, PCNotes, IDs, INSTSPEC, InstSpecGroup).");
       }
@@ -341,7 +343,9 @@ public final class GrabarMdb {
       int nextNote = Math.max(maxNote, lastId(ids, "PCNOTES")) + 1;
 
       // Índice de plantillas: ITEMCODE (sin mayúsculas) -> mejor (fecha desc, id desc) entre ITEMTYPE='Instrument'.
+      // molde[0] = la mejor de TODAS: sirve de molde cuando el instrumento no tiene calibración propia.
       Map<String, Tpl> tplIndex = new HashMap<>();
+      Tpl[] molde = new Tpl[1];
       {
         Cursor c = CursorBuilder.createCursor(cal);
         Collection<String> only = cols("CalibrationID", "CalibrationDate", "ITEMTYPE", "ITEMCODE");
@@ -352,11 +356,13 @@ public final class GrabarMdb {
           String k = ((String) code).toLowerCase(Locale.ROOT);
           Tpl cand = new Tpl(intOf(r.get("CalibrationID")), (LocalDateTime) r.get("CalibrationDate"));
           if (cand.beats(tplIndex.get(k))) tplIndex.put(k, cand);
+          // Molde global (TOP 1 ... ORDER BY CalibrationDate DESC, CalibrationID DESC del script).
+          if (cand.beats(molde[0])) molde[0] = cand;
         }
       }
 
       for (Object item : list) {
-        if (processCal(res, item, nextCid, nextNote, now, updateSpec, tplIndex, cal, grp, det, tst, notes, spec, specGrp)) {
+        if (processCal(res, item, nextCid, nextNote, now, updateSpec, tplIndex, molde, cal, grp, det, tst, notes, spec, specGrp, inst)) {
           nextCid++;
           nextNote++;
           res.insertados++;
@@ -400,12 +406,22 @@ public final class GrabarMdb {
   }
 
   static boolean processCal(Resultado res, Object dd, int cid, int note, LocalDateTime now, boolean updateSpec,
-      Map<String, Tpl> tplIndex, Table cal, Table grp, Table det, Table tst, Table notes, Table spec, Table specGrp)
+      Map<String, Tpl> tplIndex, Tpl[] molde, Table cal, Table grp, Table det, Table tst, Table notes, Table spec,
+      Table specGrp, Table inst)
       throws Exception {
     String tag = str(prop(dd, "tag"));
     if (isNullOrWhiteSpace(tag)) { res.log("  (omitido: calibración sin 'tag')"); return false; }
     Tpl best = tplIndex.get(tag.toLowerCase(Locale.ROOT));
-    if (best == null) { res.log("  OMITIDO " + tag + " (sin calibración previa de plantilla)"); return false; }
+    // PRIMERA calibración del instrumento: no hay plantilla propia. Se usa la calibración más reciente de
+    // CUALQUIER instrumento como molde y encima van los datos del equipo (INSTRMNT) y del reporte.
+    Map<String, Object> dtInst = null;
+    if (best == null) {
+      dtInst = buscarInstrumento(inst, tag);
+      if (dtInst == null) { res.log("  OMITIDO " + tag + " (no esta en el maestro de instrumentos de la base)"); return false; }
+      best = molde[0];
+      if (best == null) { res.log("  OMITIDO " + tag + " (la base no tiene ninguna calibracion de referencia)"); return false; }
+    }
+    boolean nuevo = (dtInst != null);
     int tpl = best.id;
 
     Row calRow = CursorBuilder.findRowByPrimaryKey(cal, tpl);
@@ -455,6 +471,41 @@ public final class GrabarMdb {
         "Finalized", Boolean.TRUE, "FINALIZEDBY", finBy, "ENTEREDBY", "User", "MODIFIEDBY", "User",
         "Failed", anyFail, "AsFoundFailed", anyFoundFail, "IncompleteCal", Boolean.FALSE, "DateExported", null,
         "ITEMNAME", str(prop(dd, "nombre")));
+    if (nuevo) {
+      // El molde es de OTRO instrumento: van los datos de ESTE equipo y se limpia lo que era del otro.
+      ovCal.put("ITEMTYPE", "Instrument");
+      ovCal.put("ITEMCODE", tag);
+      ovCal.put("COMPANYNAME", str(dtInst.get("COMPANYNAME")));
+      if (str(prop(dd, "nombre")).isEmpty()) ovCal.put("ITEMNAME", str(dtInst.get("INSTRUMENTNAME")));
+      for (String c : new String[] {"MANUFACTURER", "MODELNUMBER", "SERIALNUMBER", "EQUIPMENTCODE", "LOCATION",
+          "BUILDING", "STATUS", "DEPARTMENT", "CLASSIFICATION", "PNIDNUMBER", "PNIDREVISIONNUMBER", "SOPNUMBER"}) {
+        ovCal.put(c, str(dtInst.get(c)));
+      }
+      ovCal.put("FREQUENCY", str(dtInst.get("CALIBRATIONFREQUENCY")));
+      ovCal.put("LastCalibrationDate", dtInst.get("LastCalibrationDate"));
+      ovCal.put("NextCalibrationDate", dtInst.get("NextCalibrationDate"));
+      ovCal.put("NewNextCalibrationDate", null);
+      ovCal.put("DueDate", null);
+      ovCal.put("SeparateCalReadings", boolOf(dtInst.get("SeparateCalReadings")));
+      ovCal.put("CountScheduleEnabled", boolOf(dtInst.get("CountScheduleEnabled")));
+      ovCal.put("ItemCountID", intOf(dtInst.get("ItemCountID")));
+      ovCal.put("MaxCount", intOf(dtInst.get("MaxCount")));
+      ovCal.put("LastReset", intOf(dtInst.get("LastReset")));
+      ovCal.put("MeterValue", 0);
+      ovCal.put("COUNTTYPE", "");
+      ovCal.put("EQUIPMENTNAME", "");
+      ovCal.put("REASON", "");
+      ovCal.put("SOPREVISIONNUMBER", "");
+      ovCal.put("PlannedMaintID", 0);
+      ovCal.put("MaintRequestID", 0);
+      ovCal.put("ItemApprovalDate", null);
+      ovCal.put("ITEMAPPROVEDBY", "");
+      ovCal.put("UseControlLimits", Boolean.FALSE);
+      ovCal.put("ControlPct", 0.0);
+      Double mh = dbl(dtInst.get("ExpectedManHours"));
+      ovCal.put("ManHours", mh == null ? Double.valueOf(0) : mh);
+      ovCal.put("AdjustToImprove", Boolean.FALSE);
+    }
     Map<String, Object> newCal = rowHash(cal, dtCal, ovCal);
     cal.addRowFromMap(newCal);
     // la nueva calibración puede ser plantilla de otra del mismo TAG más adelante en el lote (igual que en la transacción)
@@ -462,6 +513,8 @@ public final class GrabarMdb {
       String k = ((String) newCal.get("ITEMCODE")).toLowerCase(Locale.ROOT);
       Tpl cand = new Tpl(cid, calDate);
       if (cand.beats(tplIndex.get(k))) tplIndex.put(k, cand);
+      // El molde global tambien avanza: el script lo relee de la tabla en cada instrumento del lote.
+      if (cand.beats(molde[0])) molde[0] = cand;
     }
 
     Esperado esp = new Esperado();
@@ -470,12 +523,33 @@ public final class GrabarMdb {
     esp.note = note;
     esp.grpRows = dtGrp.size();
 
-    // 3) CalGroups
-    for (Map<String, Object> row : dtGrp) {
-      int gn = intOf(row.get("GroupNumber"));
+    // 3) CalGroups. Primera calibración: los grupos salen del reporte (el molde solo aporta el formato).
+    List<Map<String, Object>> filasGrp = dtGrp;
+    if (nuevo) {
+      filasGrp = new ArrayList<Map<String, Object>>();
+      for (int i = 0; i < grupos.size(); i++) filasGrp.add(dtGrp.get(0));
+    }
+    int ig = -1;
+    for (Map<String, Object> row : filasGrp) {
+      ig++;
+      int gn = nuevo ? toInt(prop(grupos.get(ig), "gn")) : intOf(row.get("GroupNumber"));
       Object jg = null;
       for (Object g : grupos) { if (toInt(prop(g, "gn")) == gn) { jg = g; break; } }
       Map<String, Object> ovG = ov("CalibrationID", cid, "ASFOUNDSTATUS", grpStatus, "ASLEFTSTATUS", grpStatus);
+      if (nuevo) {
+        ovG.put("GroupNumber", gn);
+        ovG.put("GROUPNAME", str(prop(jg, "nombre")));
+        ovG.put("INPUTSIGNALTYPE", str(prop(jg, "unidadIn")));
+        ovG.put("OUTPUTSIGNALTYPE", str(prop(jg, "unidadOut")));
+        ovG.put("STATEDACCURACY", str(prop(jg, "precision")));
+        ovG.put("RangeAccuracyPct", dbl(prop(jg, "pctRango")));
+        ovG.put("ReadingAccuracyPct", dbl(prop(jg, "pctLectura")));
+        ovG.put("PlusMinus", dbl(prop(jg, "masMenos")));
+        ovG.put("UseControlLimits", Boolean.FALSE);
+        ovG.put("ControlPct", 0.0);
+        ovG.put("ControlPlusMinus", 0.0);
+        ovG.put("UseControlPlusMinus", Boolean.FALSE);
+      }
       if (jg != null) {
         ovG.put("Divisions", asArray(prop(jg, "puntos")).size());
         Double iLo = dbl(prop(jg, "inLow")), iHi = dbl(prop(jg, "inHigh"));
@@ -509,14 +583,25 @@ public final class GrabarMdb {
           Map<String, Object> o = ov("CalibrationID", cid, "GroupNumber", gn, "Position", p, "READINGTYPE", rt,
               "InputSignal", inNom, "OutputSignal", outNom, "NominalInputSignal", inNom,
               "LowLimit", lo, "HighLimit", hi, "Reading", v, "ReadingEntered", Boolean.TRUE, "RESULTSTATUS", rs);
+          if (nuevo) {
+            o.put("INPUTSIGNALTYPE", str(prop(g, "unidadIn")));
+            o.put("OUTPUTSIGNALTYPE", str(prop(g, "unidadOut")));
+            o.put("STATEDACCURACY", str(prop(g, "precision")));
+            o.put("DESCRIPTION", "");
+            o.put("RangeAccuracyPct", dbl(prop(g, "pctRango")));
+            o.put("ReadingAccuracyPct", dbl(prop(g, "pctLectura")));
+            o.put("PlusMinus", dbl(prop(g, "masMenos")));
+            o.put("LowControlLimit", lo);
+            o.put("HighControlLimit", hi);
+          }
           det.addRowFromMap(rowHash(det, tplRow, o));
           esp.detRows++;
         }
       }
     }
 
-    // 5) CALTEST
-    String comp = str(dtCal.get("COMPANYNAME"));
+    // 5) CALTEST (la empresa sale del equipo cuando el molde es de otro instrumento)
+    String comp = nuevo ? str(dtInst.get("COMPANYNAME")) : str(dtCal.get("COMPANYNAME"));
     List<Object> patrones = each(prop(dd, "patrones"));
     for (Object pobj : patrones) {
       List<Object> pa = each(pobj);
@@ -532,10 +617,11 @@ public final class GrabarMdb {
 
     // 6) Especificación
     List<String> specLog = new ArrayList<>();
-    if (updateSpec) updateSpec(res, specLog, tag, grupos, spec, specGrp);
+    if (updateSpec) updateSpec(res, specLog, tag, grupos, spec, specGrp, comp, str(dtCal.get("ITEMCODE")));
     res.esperados.add(esp);
 
-    res.log("  OK " + tag + " -> CalibrationID=" + cid + ", NoteID=" + note + " (plantilla=" + tpl + ", grupos="
+    res.log("  OK " + tag + " -> CalibrationID=" + cid + ", NoteID=" + note
+        + " (" + (nuevo ? ("PRIMERA calibracion, molde=" + tpl + " de otro instrumento") : ("plantilla=" + tpl)) + ", grupos="
         + asArray(prop(dd, "grupos")).size() + ", patrones=" + asArray(prop(dd, "patrones")).size() + ")");
     Map<String, Object> resumen = new LinkedHashMap<>();
     resumen.put("tag", tag);
@@ -550,6 +636,42 @@ public final class GrabarMdb {
     return true;
   }
 
+  /** SELECT TOP 1 * FROM INSTRMNT WHERE INSTRUMENTCODE=tag (orden fisico, como el script). */
+  static Map<String, Object> buscarInstrumento(Table inst, String tag) throws Exception {
+    Cursor c = CursorBuilder.createCursor(inst);
+    for (Row r = c.getNextRow(); r != null; r = c.getNextRow()) {
+      if (eqi(r.get("INSTRUMENTCODE"), tag)) return new LinkedHashMap<String, Object>(r);
+    }
+    return null;
+  }
+  /** SELECT TOP 1 * FROM INSTSPEC WHERE INSTRUMENTCODE=molde ORDER BY GroupNumber, Position. */
+  static Map<String, Object> primeraSpec(Table spec, String moldeTag) throws Exception {
+    Map<String, Object> mejor = null;
+    Cursor c = CursorBuilder.createCursor(spec);
+    for (Row r = c.getNextRow(); r != null; r = c.getNextRow()) {
+      if (!eqi(r.get("INSTRUMENTCODE"), moldeTag)) continue;
+      int gn = intOf(r.get("GroupNumber")), pos = intOf(r.get("Position"));
+      if (mejor == null || menor(gn, pos, intOf(mejor.get("GroupNumber")), intOf(mejor.get("Position")))) {
+        mejor = new LinkedHashMap<String, Object>(r);
+      }
+    }
+    return mejor;
+  }
+  /** SELECT TOP 1 * FROM InstSpecGroup WHERE INSTRUMENTCODE=molde ORDER BY GroupNumber. */
+  static Map<String, Object> primerGrupoSpec(Table specGrp, String moldeTag) throws Exception {
+    Map<String, Object> mejor = null;
+    Cursor c = CursorBuilder.createCursor(specGrp);
+    for (Row r = c.getNextRow(); r != null; r = c.getNextRow()) {
+      if (!eqi(r.get("INSTRUMENTCODE"), moldeTag)) continue;
+      if (mejor == null || intOf(r.get("GroupNumber")) < intOf(mejor.get("GroupNumber"))) {
+        mejor = new LinkedHashMap<String, Object>(r);
+      }
+    }
+    return mejor;
+  }
+  static boolean menor(int gn1, int p1, int gn2, int p2) { return gn1 != gn2 ? gn1 < gn2 : p1 < p2; }
+  static boolean boolOf(Object o) { return o instanceof Boolean && ((Boolean) o).booleanValue(); }
+
   static boolean inLim(Map<String, Double[]> lim, int gn, int pos, Double val) {
     if (val == null) return true;
     Double[] l = lim.get(gn + "|" + pos);
@@ -558,7 +680,8 @@ public final class GrabarMdb {
     return val >= l[0] - 1e-9 && val <= l[1] + 1e-9;
   }
 
-  static void updateSpec(Resultado res, List<String> specLog, String tag, List<Object> grupos, Table spec, Table specGrp)
+  static void updateSpec(Resultado res, List<String> specLog, String tag, List<Object> grupos, Table spec,
+      Table specGrp, String comp, String moldeTag)
       throws Exception {
     for (Object g : grupos) {
       int gn = toInt(prop(g, "gn"));
@@ -571,26 +694,39 @@ public final class GrabarMdb {
           if (eqi(r.get("INSTRUMENTCODE"), tag) && intOf(r.get("GroupNumber")) == gn) dtSpec.add(new LinkedHashMap<String, Object>(r));
         }
       }
-      if (dtSpec.isEmpty()) {
-        String m = "    (spec: sin INSTSPEC para grupo " + gn + " de " + tag + "; se omite la spec de ese grupo)";
-        res.log(m);
-        specLog.add(m.trim());
-        continue;
-      }
-      Map<String, Object> tplSpec = dtSpec.get(0);
       List<Object> pts = asArray(prop(g, "puntos"));
       int ndiv = pts.size();
       if (ndiv < 1) continue;
+      // Sin especificacion de ese grupo: se CREA. El molde es la spec del instrumento de la calibracion
+      // molde (grupo y posicion mas bajos) y encima van los datos del reporte.
+      boolean crear = dtSpec.isEmpty();
+      Map<String, Object> tplSpec;
+      if (crear) {
+        tplSpec = primeraSpec(spec, moldeTag);
+        if (tplSpec == null) {
+          String m = "    (spec: la base no tiene ninguna INSTSPEC de referencia; se omite el grupo " + gn + ")";
+          res.log(m);
+          specLog.add(m.trim());
+          continue;
+        }
+      } else {
+        tplSpec = dtSpec.get(0);
+      }
+      String unIn = str(prop(g, "unidadIn")), unOut = str(prop(g, "unidadOut")), prec = str(prop(g, "precision"));
+      String gname = str(prop(g, "nombre"));
+      Double ra = dbl(prop(g, "pctRango")), rd = dbl(prop(g, "pctLectura")), pm = dbl(prop(g, "masMenos"));
       Double iLo = dbl(prop(g, "inLow"));   if (iLo == null) iLo = dbl(prop(pts.get(0), "inNom"));
       Double iHi = dbl(prop(g, "inHigh"));  if (iHi == null) iHi = dbl(prop(pts.get(ndiv - 1), "inNom"));
       Double oLo = dbl(prop(g, "outLow"));  if (oLo == null) oLo = dbl(prop(pts.get(0), "outNom"));
       Double oHi = dbl(prop(g, "outHigh")); if (oHi == null) oHi = dbl(prop(pts.get(ndiv - 1), "outNom"));
 
-      // 1) UPDATE InstSpecGroup SET Divisions, rangos WHERE INSTRUMENTCODE=tag AND GroupNumber=gn
+      // 1) InstSpecGroup: UPDATE de Divisions y rangos; si el grupo no existe, se INSERTA.
+      boolean hayGrupo = false;
       {
         Cursor c = CursorBuilder.createCursor(specGrp);
         for (Row r = c.getNextRow(); r != null; r = c.getNextRow()) {
           if (!eqi(r.get("INSTRUMENTCODE"), tag) || intOf(r.get("GroupNumber")) != gn) continue;
+          hayGrupo = true;
           Map<String, Object> upd = new HashMap<String, Object>(r);
           upd.put("Divisions", ndiv);
           upd.put("InputLowRange", iLo);
@@ -600,8 +736,28 @@ public final class GrabarMdb {
           c.updateCurrentRowFromMap(upd);
         }
       }
-      // 2) DELETE FROM INSTSPEC WHERE INSTRUMENTCODE=tag AND GroupNumber=gn
-      {
+      if (!hayGrupo) {
+        Map<String, Object> tplG = primerGrupoSpec(specGrp, moldeTag);
+        if (tplG == null) {
+          String m = "    (spec: la base no tiene ningun InstSpecGroup de referencia; se omite el grupo " + gn + ")";
+          res.log(m);
+          specLog.add(m.trim());
+          continue;
+        }
+        Map<String, Object> ovG = ov("COMPANYNAME", comp, "INSTRUMENTCODE", tag, "GroupNumber", gn, "GROUPNAME", gname,
+            "Divisions", ndiv, "InputLowRange", iLo, "InputHighRange", iHi, "OutputLowRange", oLo, "OutputHighRange", oHi,
+            "INPUTSIGNALTYPE", unIn, "OUTPUTSIGNALTYPE", unOut, "STATEDACCURACY", prec,
+            "RangeAccuracyPct", ra, "ReadingAccuracyPct", rd, "PlusMinus", pm,
+            "UseControlLimits", Boolean.FALSE, "ControlPct", Double.valueOf(0), "ControlPlusMinus", Double.valueOf(0),
+            "UseControlPlusMinus", Boolean.FALSE);
+        specGrp.addRowFromMap(rowHash(specGrp, tplG, ovG));
+        res.specGrpDelta++;
+        String mc = "    spec CREADA: grupo " + gn + " de " + tag;
+        res.log(mc);
+        specLog.add(mc.trim());
+      }
+      // 2) DELETE FROM INSTSPEC WHERE INSTRUMENTCODE=tag AND GroupNumber=gn (nada que borrar si se crea)
+      if (!crear) {
         Cursor c = CursorBuilder.createCursor(spec);
         for (Row r = c.getNextRow(); r != null; r = c.getNextRow()) {
           if (eqi(r.get("INSTRUMENTCODE"), tag) && intOf(r.get("GroupNumber")) == gn) c.deleteCurrentRow();
@@ -611,13 +767,28 @@ public final class GrabarMdb {
       int pos = 0;
       for (Object pt : pts) {
         pos++;
+        Double lo = dbl(prop(pt, "low")), hi = dbl(prop(pt, "high"));
         Map<String, Object> o = ov("Position", pos, "InputSignal", dbl(prop(pt, "inNom")), "OutputSignal", dbl(prop(pt, "outNom")),
-            "LowLimit", dbl(prop(pt, "low")), "HighLimit", dbl(prop(pt, "high")));
+            "LowLimit", lo, "HighLimit", hi);
+        if (crear) {
+          o.put("COMPANYNAME", comp);
+          o.put("INSTRUMENTCODE", tag);
+          o.put("GroupNumber", gn);
+          o.put("INPUTSIGNALTYPE", unIn);
+          o.put("OUTPUTSIGNALTYPE", unOut);
+          o.put("STATEDACCURACY", prec);
+          o.put("RangeAccuracyPct", ra);
+          o.put("ReadingAccuracyPct", rd);
+          o.put("PlusMinus", pm);
+          o.put("LowControlLimit", lo);
+          o.put("HighControlLimit", hi);
+          o.put("DESCRIPTION", "");
+        }
         spec.addRowFromMap(rowHash(spec, tplSpec, o));
       }
       res.specDelta += ndiv - dtSpec.size();
       res.specFinal.put(tag.toLowerCase(Locale.ROOT) + "|" + gn, ndiv);
-      String m = "    spec actualizada: grupo " + gn + " -> " + ndiv + " puntos, entrada " + num(iLo) + ".." + num(iHi)
+      String m = "    spec " + (crear ? "creada" : "actualizada") + ": grupo " + gn + " -> " + ndiv + " puntos, entrada " + num(iLo) + ".." + num(iHi)
           + ", salida " + num(oLo) + ".." + num(oHi);
       res.log(m);
       specLog.add(m.trim());
