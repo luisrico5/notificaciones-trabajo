@@ -226,6 +226,34 @@ async function main() {
   ok(await ev(`repState.h.fdt==='09/03/2026' && repState.h.dt==='06/03/2026'`), "al reabrirlo conserva ambas fechas");
   ok(await finPdf() === "09/03/2026", "y el PDF sigue imprimiendo la suya");
 
+  console.log("\n[8] Equipo sin especificación en la base: plantilla con valores por defecto");
+  await ev("switchTab('reporte'); document.getElementById('repTag').value='LIT-B102'; document.getElementById('repBuscar').click(); true");
+  await esperar("!!repState && repState.rec.tag==='LIT-B102'", 15000, "búsqueda del equipo sin spec");
+  ok(await ev("repState.sinSpec===true"), "se reconoce que no tiene especificación");
+  ok(await ev("/no tiene especificación de calibración/.test(document.getElementById('repForm').textContent)"), "avisa que la plantilla sale con valores por defecto");
+  ok(await ev("repState.rec.n==='NIVEL DEL TK-21C'"), "los datos del equipo salen de la base (nombre)");
+  const g8 = await ev("JSON.stringify({pts:repState.groups[0].rows.length, it:repState.groups[0].meta.it, ot:repState.groups[0].meta.ot, r:repState.groups[0].range})");
+  ok(/"pts":5/.test(g8) && /"it":"%"/.test(g8) && /"ot":"mA"/.test(g8) && /"iLo":0/.test(g8) && /"iHi":100/.test(g8) && /"oLo":4/.test(g8) && /"oHi":20/.test(g8), "grupo por defecto: 5 puntos, 0-100 % → 4-20 mA  " + g8);
+  ok(await ev("Math.abs(repState.groups[0].rows[0].hi-4.1)<1e-9 && Math.abs(repState.groups[0].rows[0].lo-3.9)<1e-9"), "límites ±0,5 % del rango");
+  ok(await ev("document.querySelectorAll('#repForm input[data-k=\"found\"]').length===5"), "la tabla trae los 5 puntos editables");
+  // Se ajusta como cualquier otro: unidades, puntos y rango.
+  await ev(`var el=document.querySelector('#repForm [data-guin="0"]'); el.value='°C'; el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); true`);
+  await ev(`var el=document.querySelector('#repForm [data-gimax="0"]'); el.value='150'; el.dispatchEvent(new Event('change',{bubbles:true})); true`);
+  await ev(`var el=document.querySelector('#repForm [data-gpts="0"]'); el.value='3'; el.dispatchEvent(new Event('change',{bubbles:true})); true`);
+  ok(await ev("repState.groups[0].meta.it==='°C' && repState.groups[0].range.iHi===150 && repState.groups[0].rows.length===3"), "se pueden cambiar unidad, rango y N.º de puntos");
+  ok(await ev("/°C/.test(document.getElementById('repForm').textContent)"), "la tabla muestra la unidad escrita");
+  // El PDF sale con esos datos y el reporte se guarda y reabre igual.
+  ok(await ev("/LIT-B102/.test(repBuildHtml()) && /NIVEL DEL TK-21C/.test(repBuildHtml())"), "el reporte se genera con los datos del equipo");
+  await ev("document.getElementById('repGuardarNube').click(); true");
+  await esperar("/guardado en tu cuenta/.test(document.getElementById('repNubeMsg').textContent)", 30000, "guardado");
+  await ev("document.getElementById('repLimpiar').click(); true");
+  await esperar("REP_BATCH.length===0", 10000, "lote vaciado");
+  await ev("switchTab('mis'); true");
+  await esperar("/LIT-B102/.test(document.getElementById('misList').textContent)", 20000, "lista");
+  await ev(`(function(){ var tr=Array.from(document.querySelectorAll('#misList tbody tr')).find(function(t){ return /LIT-B102/.test(t.textContent); }); tr.querySelector('[data-open]').click(); })(); true`);
+  await esperar("!!repState && repState.rec.tag==='LIT-B102'", 30000, "reabierto");
+  ok(await ev("repState.groups[0].meta.it==='°C' && repState.groups[0].rows.length===3 && repState.groups[0].range.iHi===150"), "al reabrirlo conserva unidad, puntos y rango");
+
   ok(errores.length === 0, "sin errores de JavaScript en consola" + (errores.length ? ": " + errores.join(" | ") : ""));
   console.log("\nRESULTADO ABRIR NAVEGADOR: " + pass + " OK, " + fail + " FAIL");
   ws.close(); chrome.kill(); server.close(); mock.close();

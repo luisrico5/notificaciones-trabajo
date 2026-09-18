@@ -91,6 +91,13 @@ DPCTrack2, a partir de un TAG.
 
 > Los datos salen de la misma base incrustada (o del `datos_calibracion.json` adjunto). Si el TAG no está,
 > avisa y no inventa nada.
+>
+> **Equipo que está en la base pero sin especificación de calibración:** igual sale la plantilla. La cabecera
+> (fabricante, modelo, serie, ubicación…) viene de la base y los puntos salen con **valores por defecto**
+> (5 puntos, entrada 0-100 %, salida 4-20 mA, ±0,5 % del rango). El formulario lo avisa y ahí puedes escribir
+> también las **unidades** de entrada y salida, además del N.º de puntos y los mín/máx de siempre. Eso sí:
+> para **grabar en la base** el instrumento necesita una calibración anterior que sirva de plantilla; si no la
+> tiene, el PDF se genera igual pero el grabado lo omite.
 
 **Por lote:** al **procesar el pegado o el Excel** en Notificaciones se generan también los reportes de
 todos los instrumentos que estén en la base; en la pestaña de reporte hay un **desplegable** para revisarlos

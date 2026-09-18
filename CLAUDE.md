@@ -163,7 +163,18 @@ está en medio y el archivo se regenera).
   y patrones del último reporte con detalle (`std=[code,name,mf,model,serial,lastCal,nextCal]`). Los defaults
   de temp/humedad/tipo/certificado/técnico salen del reporte más reciente (`CALIBRAT`); la nota por defecto usa
   el P-SG del mapeo (`procForTag`→`detectKey`). **Lo único que se ingresa a mano son los valores de calibración**
-  (Enc. como / Dejado como por punto); todo lo demás es editable pero prellenado. **"Fecha de finalización"
+  (Enc. como / Dejado como por punto); todo lo demás es editable pero prellenado.
+  **Equipos SIN especificación en la base** (existen en `INSTRMNT` pero sin filas en `INSTSPEC`; 10 de 1.481):
+  `TAG_REPORT` los incluye con `g:[]` (antes se descartaban y el TAG "no se encontraba") y `repBuildState` les
+  arma una plantilla por defecto con `specPorDefecto()` — 1 grupo, 5 puntos, entrada 0-100 %, salida 4-20 mA,
+  `sa:"Pct of Range"` con `ra:0.005` (±0,5 % del rango, el caso más común de la base) — y marca
+  `st.sinSpec=true`. El formulario avisa en amarillo y, **solo en ese caso**, deja editar las **unidades** del
+  grupo (`data-guin`/`data-guout`): ahí `meta` es un objeto nuevo por reporte, así que editarlo no muta
+  `TAG_REPORT` (los grupos con spec comparten `rec.g`, por eso en ellos no se editan). `serializeCal` guarda
+  `it`/`ot` por grupo y `deserializeCal` los aplica si `sinSpec`. La cabecera (fabricante, modelo, serie,
+  ubicación…) sí sale de la base. Ojo: grabar en la base exige una calibración previa como plantilla, así que
+  estos equipos se **omiten** al grabar (con aviso del script).
+  **"Fecha de finalización"
   (`h.fdt`, campo editable de `REP_FIELDS`)**: es la del reporte, NUNCA la de hoy (antes se imprimía
   `nowStamp()`, un bug). Arranca igual a la fecha de calibración (`h.dt`) — también cuando `buildRepBatch`
   toma la fecha de la orden — y la **sigue mientras no se edite aparte** (el listener de `dt` la arrastra solo

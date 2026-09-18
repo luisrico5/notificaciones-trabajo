@@ -525,12 +525,13 @@ public final class Extractor {
     List<String> instKeys = new ArrayList<>(inst.keySet());
     ordenarCultura(instKeys);   // Sort-Object: si dos TAG se normalizan igual, gana el último
     for (String ck : instKeys) {
-      if (!groups.containsKey(ck)) continue;
+      // TODOS los instrumentos del maestro: los que no tienen especificación van con g=[] y el dashboard
+      // les arma una plantilla con valores por defecto (editable).
       Map<String, Object> rec = inst.get(ck);
       String code = (String) rec.get("tag");
       String k = normTag(code);
       if (k.isEmpty()) continue;
-      List<Map<String, Object>> gl = new ArrayList<>(groups.get(ck).values());
+      List<Map<String, Object>> gl = groups.containsKey(ck) ? new ArrayList<>(groups.get(ck).values()) : new ArrayList<Map<String, Object>>();
       Collections.sort(gl, new Comparator<Map<String, Object>>() {
         @Override public int compare(Map<String, Object> a, Map<String, Object> b) { return Integer.compare((Integer) a.get("gn"), (Integer) b.get("gn")); }
       });

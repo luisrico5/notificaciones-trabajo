@@ -213,15 +213,17 @@ foreach ($r in $specRows.Rows) {
   if ($g.it -eq "") { $g.it = (Str $r['INPUTSIGNALTYPE']) }
   if ($g.ot -eq "") { $g.ot = (Str $r['OUTPUTSIGNALTYPE']) }
 }
-# Ensamblar registros TAG_REPORT (solo instrumentos con especificaciones/puntos).
+# Ensamblar registros TAG_REPORT (TODOS los instrumentos del maestro). Los que no tienen especificación
+# en la base quedan con g=[] y el dashboard les arma una plantilla con valores por defecto, editable.
 $rep = [ordered]@{}
 foreach ($code in ($inst.Keys | Sort-Object)) {
-  if (-not $groups.ContainsKey($code)) { continue }
   $k = NormTag $code; if ($k -eq '') { continue }
   $rec = $inst[$code]
-  # Grupos ordenados por número.
+  # Grupos ordenados por número (vacío si el instrumento no tiene especificación).
   $gl = @()
-  foreach ($gk in ($groups[$code].Keys | Sort-Object { [int]$_ })) { $gl += , $groups[$code][$gk] }
+  if ($groups.ContainsKey($code)) {
+    foreach ($gk in ($groups[$code].Keys | Sort-Object { [int]$_ })) { $gl += , $groups[$code][$gk] }
+  }
   $rec['g'] = @($gl)
   # Defaults del reporte más reciente (temp, humedad, tipo, certificado, técnico) + patrones con detalle.
   if ($latest.ContainsKey($code)) {

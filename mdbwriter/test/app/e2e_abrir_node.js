@@ -42,7 +42,7 @@ function load() {
     encodeURIComponent, decodeURIComponent, Uint8Array, Int8Array, ArrayBuffer, document, localStorage: store, sessionStorage: mkStore(), navigator: { onLine: true },
     location: { reload() {} }, window: w, self: w, fetch: fetchMock, alert() {}, confirm() { return estado.confirm; }, FileReader: function () {}, Blob, Response,
     URL: { createObjectURL() { return ""; }, revokeObjectURL() {} }, html2pdf: function () { return { set() { return this; }, from() { return this; }, save() { return Promise.resolve(); } }; } });
-  vm.runInContext(APP + "\n;globalThis.__api={misReportes, makeRow, repLookup, repBuildState, avisoSalida, normTag, get rows(){return rows;}, get REP_BATCH(){return REP_BATCH;}, get repState(){return repState;}, get REP_BATCH_EDITADO(){return REP_BATCH_EDITADO;}, get _appBooted(){return _appBooted;}};", ctx, { filename: "app.js" });
+  vm.runInContext(APP + "\n;globalThis.__api={misReportes, makeRow, repLookup, repBuildState, regenPoints, avisoSalida, normTag, get rows(){return rows;}, get REP_BATCH(){return REP_BATCH;}, get repState(){return repState;}, get REP_BATCH_EDITADO(){return REP_BATCH_EDITADO;}, get _appBooted(){return _appBooted;}};", ctx, { filename: "app.js" });
   return { api: ctx.__api, els, nube, store, estado };
 }
 // Arma una fila de la tabla "reportes" tal como la guarda la app.
@@ -188,6 +188,37 @@ function filaNoti(api, tag, ot, recibido, id, fecha) {
     await api.misReportes.abrirSeleccionados();
     eq(L.nube.gets.length, 2, "se pidieron en 2 lotes (40 + 5), sin URLs enormes");
     eq(api.rows.length, 45, "se abrieron las 45 órdenes");
+  }
+
+  console.log("\n[A7] Equipo en la base sin especificación: plantilla por defecto");
+  { const L = load(); await sleep(30); const api = L.api;
+    const rec = api.repLookup("LIT-B102");
+    ok(!!rec, "el equipo sin especificación se encuentra en los datos de la base");
+    eq((rec.g || []).length, 0, "y viene sin grupos de especificación");
+    const st = api.repBuildState(rec);
+    eq(st.sinSpec, true, "el reporte se marca como 'sin especificación'");
+    eq(st.groups.length, 1, "se arma un grupo por defecto");
+    eq(st.groups[0].rows.length, 5, "con 5 puntos");
+    eq(st.groups[0].meta.it + "→" + st.groups[0].meta.ot, "%→mA", "entrada % y salida mA");
+    eq(st.groups[0].range.iLo + "-" + st.groups[0].range.iHi, "0-100", "rango de entrada 0-100");
+    eq(st.groups[0].range.oLo + "-" + st.groups[0].range.oHi, "4-20", "rango de salida 4-20");
+    ok(Math.abs(st.groups[0].rows[0].hi - 4.1) < 1e-9 && Math.abs(st.groups[0].rows[4].lo - 19.9) < 1e-9, "límites ±0,5 % del rango");
+    ok(st.h.mf !== undefined && rec.n === "NIVEL DEL TK-21C", "los datos del equipo salen de la base");
+    // Cada reporte tiene su propio grupo: editar sus unidades NO toca los datos base ni a otro reporte.
+    st.groups[0].meta.it = "°C";
+    const st2 = api.repBuildState(api.repLookup("LIT-B102"));
+    eq(st2.groups[0].meta.it, "%", "editar las unidades de uno no afecta a los demás");
+    // Round-trip: se guarda y se reabre igual.
+    st.groups[0].range.iHi = 150; api.regenPoints(st.groups[0], 3);
+    const p = JSON.parse(JSON.stringify(api.misReportes.serializeCal(st)));
+    const st3 = api.misReportes.deserializeCal(p);
+    eq(st3.groups[0].meta.it, "°C", "al reabrir conserva la unidad editada");
+    eq(st3.groups[0].rows.length, 3, "y el N.º de puntos");
+    eq(st3.groups[0].range.iHi, 150, "y el rango");
+    // Un equipo con especificación sigue igual que siempre.
+    const st4 = api.repBuildState(api.repLookup("PT-U7122"));
+    eq(st4.sinSpec, false, "los equipos con especificación no se marcan");
+    ok(st4.groups.length >= 1 && st4.groups[0].rows.length >= 2, "y conservan sus puntos de la base");
   }
 
   console.log("\nRESUMEN ABRIR: " + pass + " OK, " + fail + " FAIL");
